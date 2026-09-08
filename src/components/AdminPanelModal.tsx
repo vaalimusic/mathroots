@@ -25,7 +25,11 @@ import {
   ExternalLink,
   Clock,
   Search,
-  Key
+  Key,
+  MessageSquare,
+  Send,
+  Bot,
+  User
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -113,19 +117,44 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   },
 ];
 
+export type AdminTab = 'providers' | 'chat_test' | 'cache' | 'system';
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  latencyMs?: number;
+  provider?: string;
+  model?: string;
+}
+
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   isOpen,
   onClose,
   currentUser,
   onLoginSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<'providers' | 'cache' | 'system'>('providers');
+  const [activeTab, setActiveTab] = useState<AdminTab>('providers');
 
   // Admin login gate state
   const [loginUser, setLoginUser] = useState('admin');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Chat Test State
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: 'Привет! Я математический ИИ-ассистент MathRoots. Задайте мне вопрос по формулам, уравнениям или концепциям, чтобы протестировать текущую модель.',
+      timestamp: new Date(),
+    },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatUseFormConfig, setChatUseFormConfig] = useState(true);
 
   // Form state
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>('openrouter');
@@ -289,6 +318,73 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedKey(label);
     setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  // Send message in model chat tester
+  const handleSendChatMessage = async (presetText?: string) => {
+    const textToSend = (presetText || chatInput).trim();
+    if (!textToSend || chatLoading) return;
+
+    const userMsg: ChatMessage = {
+      id: `user_${Date.now()}`,
+      role: 'user',
+      content: textToSend,
+      timestamp: new Date(),
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+    if (!presetText) setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const targetConfig = chatUseFormConfig
+        ? {
+            provider: selectedProvider,
+            model,
+            api_key: apiKey,
+            base_url: baseUrl,
+            folder_id: folderId,
+            temperature,
+          }
+        : undefined;
+
+      const historyPayload = [...chatMessages, userMsg]
+        .filter((m) => m.id !== 'welcome')
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const res = await api.testAiChat(historyPayload, targetConfig);
+
+      if (res?.success) {
+        const assistantMsg: ChatMessage = {
+          id: `assistant_${Date.now()}`,
+          role: 'assistant',
+          content: res.reply,
+          timestamp: new Date(),
+          latencyMs: res.latencyMs,
+          provider: res.provider,
+          model: res.model,
+        };
+        setChatMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        const errorMsg: ChatMessage = {
+          id: `error_${Date.now()}`,
+          role: 'assistant',
+          content: `❌ Ошибка вызова модели: ${res?.error || 'Неизвестная ошибка'}`,
+          timestamp: new Date(),
+        };
+        setChatMessages((prev) => [...prev, errorMsg]);
+      }
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: `error_${Date.now()}`,
+        role: 'assistant',
+        content: `❌ Ошибка сети: ${err.message || String(err)}`,
+        timestamp: new Date(),
+      };
+      setChatMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   // Fetch DataKey Balance / Usage
@@ -534,6 +630,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               >
                 <Cpu className="w-3.5 h-3.5" />
                 <span>ИИ Провайдеры</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('chat_test')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'chat_test'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
+                <span>Чат-тест моделей</span>
               </button>
 
               <button
@@ -1042,15 +1150,26 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
-                  <button
-                    type="button"
-                    onClick={handleTestConnection}
-                    disabled={testing}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141828] hover:bg-[#1d233c] text-slate-200 hover:text-white border border-white/[0.1] text-xs font-bold transition-all disabled:opacity-50"
-                  >
-                    <Activity className={`w-3.5 h-3.5 text-indigo-400 ${testing ? 'animate-spin' : ''}`} />
-                    <span>{testing ? 'Проверяем связь...' : 'Проверить подключение'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTestConnection}
+                      disabled={testing}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141828] hover:bg-[#1d233c] text-slate-200 hover:text-white border border-white/[0.1] text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      <Activity className={`w-3.5 h-3.5 text-indigo-400 ${testing ? 'animate-spin' : ''}`} />
+                      <span>{testing ? 'Проверяем связь...' : 'Проверить подключение'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('chat_test')}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-xs font-bold transition-all"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Чат-тест модели</span>
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {saveSuccess && (
@@ -1070,6 +1189,187 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </button>
                   </div>
                 </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB: LIVE INTERACTIVE CHAT TEST */}
+          {activeTab === 'chat_test' && (
+            <div className="space-y-4 flex flex-col h-[560px]">
+              {/* Chat Config Header Bar */}
+              <div className="p-3.5 rounded-2xl bg-[#070911] border border-white/[0.08] flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>Интерактивный тест модели</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        {chatUseFormConfig ? `${selectedProvider} • ${model}` : `${activeConfig?.provider || 'default'} • ${activeConfig?.model || 'gemini'}`}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Отправка реальных запросов к настроенной модели с замером времени ответа
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={chatUseFormConfig}
+                      onChange={(e) => setChatUseFormConfig(e.target.checked)}
+                      className="accent-indigo-500"
+                    />
+                    <span>Тестировать текущую форму ({selectedProvider})</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setChatMessages([
+                        {
+                          id: 'welcome',
+                          role: 'assistant',
+                          content:
+                            'Привет! Я математический ИИ-ассистент MathRoots. Задайте мне вопрос по формулам, уравнениям или концепциям, чтобы протестировать текущую модель.',
+                          timestamp: new Date(),
+                        },
+                      ])
+                    }
+                    className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-slate-200 transition-colors text-[11px]"
+                  >
+                    Очистить переписку
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Prompt Suggestions */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px]">
+                <span className="text-slate-500 shrink-0">Быстрые тесты:</span>
+                {[
+                  'Разложи задачу 2x + 5 = 15 на корни',
+                  'Объясни теорему Пифагора простыми словами',
+                  'Почему (-3)^2 = 9? Докажи через аксиомы',
+                  'Тест связи: назови свою модель и ответь 2+2',
+                  'Что такое геометрический смысл производной?',
+                ].map((promptText) => (
+                  <button
+                    key={promptText}
+                    type="button"
+                    disabled={chatLoading}
+                    onClick={() => handleSendChatMessage(promptText)}
+                    className="px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-indigo-500/20 hover:text-indigo-300 hover:border-indigo-500/40 border border-white/[0.06] text-slate-300 whitespace-nowrap transition-all text-[11px]"
+                  >
+                    {promptText}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Message History Window */}
+              <div className="flex-1 overflow-y-auto p-4 rounded-2xl bg-[#060810] border border-white/[0.08] space-y-3.5 font-sans">
+                {chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {msg.role === 'assistant' && (
+                      <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-md shadow-sky-600/20">
+                        <Bot className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+
+                    <div
+                      className={`max-w-[80%] rounded-2xl p-3.5 space-y-2 text-xs leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 rounded-tr-none'
+                          : 'bg-[#0f1220] border border-white/[0.08] text-slate-200 rounded-tl-none shadow-lg'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 text-[10px] opacity-75 border-b border-white/[0.08] pb-1">
+                        <span className="font-bold">
+                          {msg.role === 'user' ? 'Вы (Администратор)' : 'ИИ-ассистент'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {msg.latencyMs !== undefined && (
+                            <span className="font-mono text-amber-300 font-bold">
+                              ⚡ {msg.latencyMs} мс
+                            </span>
+                          )}
+                          {msg.provider && (
+                            <span className="font-mono text-indigo-300">
+                              [{msg.provider}: {msg.model}]
+                            </span>
+                          )}
+                          {msg.role === 'assistant' && msg.id !== 'welcome' && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(msg.content, msg.id)}
+                              className="text-slate-400 hover:text-white"
+                              title="Скопировать ответ"
+                            >
+                              {copiedKey === msg.id ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="whitespace-pre-wrap font-sans text-xs">
+                        {msg.content}
+                      </div>
+                    </div>
+
+                    {msg.role === 'user' && (
+                      <div className="w-7 h-7 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 flex items-center justify-center shrink-0 mt-1">
+                        <User className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {chatLoading && (
+                  <div className="flex gap-3 justify-start animate-in fade-in">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white flex items-center justify-center shrink-0 mt-1">
+                      <Bot className="w-3.5 h-3.5 animate-spin" />
+                    </div>
+                    <div className="p-3.5 rounded-2xl rounded-tl-none bg-[#0f1220] border border-white/[0.08] text-xs text-slate-400 flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                      <span>Модель генерирует ответ...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Input Bar */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendChatMessage();
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Задайте математический вопрос для проверки модели..."
+                  disabled={chatLoading}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-[#070911] border border-white/[0.1] text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={chatLoading || !chatInput.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Отправить</span>
+                </button>
               </form>
             </div>
           )}

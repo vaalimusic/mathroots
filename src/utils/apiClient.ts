@@ -239,6 +239,13 @@ export const api = {
     });
   },
 
+  async testAiChat(messages: Array<{ role: string; content: string }>, config?: any) {
+    return await apiRequest('/api/admin/ai/chat-test', {
+      method: 'POST',
+      body: JSON.stringify({ messages, config }),
+    });
+  },
+
   async getAiCacheStats() {
     return await apiRequest('/api/admin/cache/stats');
   },

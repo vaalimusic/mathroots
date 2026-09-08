@@ -403,3 +403,152 @@ export async function testAiProviderConnection(config: DbAiConfig): Promise<{
     };
   }
 }
+
+/**
+ * Free-form Chat Completion helper for Live Model Testing
+ */
+export async function callProviderChat(
+  messages: Array<{ role: string; content: string }>,
+  activeConfig: DbAiConfig | null
+): Promise<{ reply: string; provider: string; model: string; latencyMs: number }> {
+  const startTime = Date.now();
+  const provider = activeConfig?.provider || 'gemini';
+  const model =
+    activeConfig?.model ||
+    (provider === 'deepseek'
+      ? 'deepseek-chat'
+      : provider === 'openrouter'
+      ? 'deepseek/deepseek-r1'
+      : provider === 'datakey'
+      ? 'claude-sonnet-4-6'
+      : 'gemini-3.1-flash-lite');
+  const apiKey = activeConfig?.api_key || process.env.GEMINI_API_KEY || '';
+
+  let replyText = '';
+
+  // 1. DataKey (OpenAI drop-in format)
+  if (provider === 'datakey') {
+    if (!apiKey) throw new Error('API-ключ DataKey не указан.');
+    const cleanBase = (activeConfig?.base_url || 'https://ai.datakey.one/v1').replace(/\/+$/, '');
+    const url = cleanBase.endsWith('/v1') ? `${cleanBase}/chat/completions` : `${cleanBase}/v1/chat/completions`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: activeConfig?.temperature ?? 0.7,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`DataKey HTTP ${response.status}: ${err.slice(0, 200)}`);
+    }
+    const json = await response.json();
+    replyText = json?.choices?.[0]?.message?.content || 'Нет ответа от модели DataKey';
+  }
+  // 2. OpenRouter
+  else if (provider === 'openrouter') {
+    if (!apiKey) throw new Error('API-ключ OpenRouter не указан.');
+    const url = activeConfig?.base_url || 'https://openrouter.ai/api/v1/chat/completions';
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://mathroots.app',
+        'X-Title': 'MathRoots',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: activeConfig?.temperature ?? 0.7,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`OpenRouter HTTP ${response.status}: ${err.slice(0, 200)}`);
+    }
+    const json = await response.json();
+    replyText = json?.choices?.[0]?.message?.content || 'Нет ответа от модели OpenRouter';
+  }
+  // 3. DeepSeek
+  else if (provider === 'deepseek') {
+    if (!apiKey) throw new Error('API-ключ DeepSeek не указан.');
+    const url = `${activeConfig?.base_url || 'https://api.deepseek.com'}/chat/completions`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: activeConfig?.temperature ?? 0.7,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`DeepSeek HTTP ${response.status}: ${err.slice(0, 200)}`);
+    }
+    const json = await response.json();
+    replyText = json?.choices?.[0]?.message?.content || 'Нет ответа от модели DeepSeek';
+  }
+  // 4. OpenAI / Custom
+  else if (provider === 'openai') {
+    const url = `${activeConfig?.base_url || 'https://api.openai.com/v1'}/chat/completions`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey || 'no-key'}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: activeConfig?.temperature ?? 0.7,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`OpenAI HTTP ${response.status}: ${err.slice(0, 200)}`);
+    }
+    const json = await response.json();
+    replyText = json?.choices?.[0]?.message?.content || 'Нет ответа от модели';
+  }
+  // 5. Yandex AI
+  else if (provider === 'yandex') {
+    if (!apiKey) throw new Error('API-ключ Yandex AI не указан.');
+    if (!activeConfig?.folder_id) throw new Error('Folder ID каталога обязателен для Yandex AI.');
+    const modelUri = `gpt://${activeConfig.folder_id}/${model || 'yandexgpt/latest'}`;
+    const response = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Api-Key ${apiKey}`,
+        'x-folder-id': activeConfig.folder_id,
+      },
+      body: JSON.stringify({
+        modelUri,
+        completionOptions: { stream: false, temperature: activeConfig?.temperature ?? 0.7, maxTokens: '2000' },
+        messages: messages.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', text: m.content })),
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Yandex AI HTTP ${response.status}: ${err.slice(0, 200)}`);
+    }
+    const json = await response.json();
+    replyText = json?.result?.alternatives?.[0]?.message?.text || 'Нет ответа от Yandex AI';
+  }
+  // 6. Gemini
+  else {
+    const key = apiKey || process.env.GEMINI_API_KEY;
+    if (!key) throw new Error('GEMINI_API_KEY не установлен.');
+    const ai = new GoogleGenAI({ apiKey: key });
+    const contents = messages.map((m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`).join('\n\n');
+    const response = await ai.models.generateContent({
+      model: model || 'gemini-2.5-flash',
+      contents,
+    });
+    replyText = response.text || 'Нет ответа от Gemini';
+  }
+
+  const latencyMs = Date.now() - startTime;
+  return { reply: replyText, provider, model, latencyMs };
+}

@@ -21,6 +21,7 @@ import {
   executeAiWithCache,
   callProvider,
   testAiProviderConnection,
+  callProviderChat,
 } from "./server/aiDispatcher";
 
 dotenv.config();
@@ -773,6 +774,26 @@ app.post("/api/admin/ai/test", requireAdmin, async (req: AuthRequest, res) => {
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Live Interactive Chat Test for model settings
+app.post("/api/admin/ai/chat-test", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { messages, config } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "Поле messages обязательно и должно быть массивом" });
+    }
+
+    let targetConfig = config;
+    if (!targetConfig || !targetConfig.provider) {
+      targetConfig = await db.getActiveAiConfig();
+    }
+
+    const result = await callProviderChat(messages, targetConfig);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || String(err) });
   }
 });
 
