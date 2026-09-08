@@ -23,6 +23,7 @@ import { MathSyntaxInspectorModal } from './components/MathSyntaxInspectorModal'
 import { AuthModal } from './components/AuthModal';
 import { ShareTreeModal } from './components/ShareTreeModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
+import { PlatformGuideModal } from './components/PlatformGuideModal';
 import {
   Sparkles,
   TreeDeciduous,
@@ -110,6 +111,7 @@ export default function App() {
   const [visualLabDefaultTab, setVisualLabDefaultTab] = useState<VisualLabTab>('balance');
   const [isWorkoutOpen, setIsWorkoutOpen] = useState(false);
   const [isCheatSheetOpen, setIsCheatSheetOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   // Auth & Cloud Sharing Modals
@@ -302,6 +304,9 @@ export default function App() {
     switch (section) {
       case 'my_map':
         setIsMyKnowledgeMapOpen(true);
+        break;
+      case 'guide':
+        setIsGuideOpen(true);
         break;
       case 'solve_problem':
         setActiveTreeId('linear_mvp');
@@ -808,6 +813,19 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
         }}
+      />
+
+      {/* Platform Documentation & User Guide Modal */}
+      <PlatformGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+        onOpenVisualLab={(tab) => handleOpenVisualLab(tab)}
+        onOpenWorkout={() => setIsWorkoutOpen(true)}
+        onOpenSyntaxInspector={() => handleOpenSyntaxInspector('2x + 10', 3)}
+        onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenBuilder={() => setIsBuilderOpen(true)}
+        onOpenCheatSheet={() => setIsCheatSheetOpen(true)}
+        onOpenGaps={() => setIsMyGapsOpen(true)}
       />
 
       {/* Shared Tree Notification Toast */}

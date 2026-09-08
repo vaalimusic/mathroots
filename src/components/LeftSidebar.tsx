@@ -20,6 +20,7 @@ import {
 
 export type LeftNavSection =
   | 'my_map'
+  | 'guide'
   | 'solve_problem'
   | 'syntax_guide'
   | 'explore_topic'
@@ -64,6 +65,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       icon: Map,
       badge: `${masteredPercent}%`,
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    },
+    {
+      id: 'guide',
+      label: 'Инструкция & Руководство',
+      icon: BookOpen,
+      badge: 'Гид',
+      badgeColor: 'bg-gradient-to-r from-emerald-500/20 to-indigo-500/20 text-emerald-300 border border-emerald-500/30 font-bold',
     },
     {
       id: 'solve_problem',

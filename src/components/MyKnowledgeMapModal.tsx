@@ -326,7 +326,7 @@ export const MyKnowledgeMapModal: React.FC<MyKnowledgeMapModalProps> = ({
 
               {workoutStats && Object.keys(workoutStats.byCategory).length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(workoutStats.byCategory).map(([cat, info]) => (
+                  {Object.entries(workoutStats.byCategory).map(([cat, info]: [string, any]) => (
                     <div
                       key={cat}
                       className="p-3.5 rounded-2xl bg-[#070911] border border-white/[0.06] space-y-2"
