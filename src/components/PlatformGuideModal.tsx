@@ -739,6 +739,19 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
                       Поддержка прямого Gemini API (`gemini-1.5-pro/flash`) и любых OpenAI-совместимых шлюзов с кастомным base URL.
                     </div>
                   </div>
+
+                  <div className="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-500/40 space-y-1.5 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>DataKey (Claude & GPT)</span>
+                        <span className="text-[10px] text-indigo-300 bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-500/30">Оплата в рублях</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-300 font-mono">https://ai.datakey.one/v1</span>
+                    </div>
+                    <div className="text-xs text-slate-300">
+                      API-прокси для топовых моделей Claude (Opus 5, Sonnet 4.6/5, Haiku) и GPT (5.6, 5.4-mini). Совместим с OpenAI SDK (drop-in). Один ключ открывает доступ ко всем моделям с оплатой в рублях через СБП или банковские карты РФ. В админ-панели доступна автоматическая проверка баланса и покупка ключа в 1 клик.
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -15,7 +15,7 @@ export interface DbUser {
 
 export interface DbAiConfig {
   id: string;
-  provider: 'openrouter' | 'deepseek' | 'yandex' | 'gemini' | 'openai';
+  provider: 'openrouter' | 'deepseek' | 'yandex' | 'gemini' | 'openai' | 'datakey';
   model: string;
   api_key: string | null;
   base_url: string | null;

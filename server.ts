@@ -798,6 +798,140 @@ app.delete("/api/admin/cache", requireAdmin, async (_req: AuthRequest, res) => {
 });
 
 // -------------------------------------------------------------
+// DataKey Management Endpoints (Keykit API Proxy)
+// -------------------------------------------------------------
+
+const DATAKEY_KEYKIT_BASE = "https://keykit.datakey.one/api";
+
+// Check DataKey balance and usage
+app.post("/api/admin/datakey/usage", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { api_key } = req.body;
+    if (!api_key) {
+      return res.status(400).json({ error: "Параметр api_key обязателен" });
+    }
+    const resp = await fetch(`${DATAKEY_KEYKIT_BASE}/usage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_value: api_key }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json(data);
+    }
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка запроса баланса DataKey", details: err.message });
+  }
+});
+
+// Get DataKey tariffs and buy config
+app.get("/api/admin/datakey/buy-config", requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const resp = await fetch(`${DATAKEY_KEYKIT_BASE}/buy/config`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json(data);
+    }
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка получения тарифов DataKey", details: err.message });
+  }
+});
+
+// Create DataKey order and get payment link
+app.post("/api/admin/datakey/checkout", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { amount_usd, product } = req.body;
+    if (!amount_usd) {
+      return res.status(400).json({ error: "Сумма в USD обязательна" });
+    }
+    const resp = await fetch(`${DATAKEY_KEYKIT_BASE}/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount_usd: Number(amount_usd),
+        product: product || "claude",
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json(data);
+    }
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка создания заказа DataKey", details: err.message });
+  }
+});
+
+// Poll DataKey order status
+app.get("/api/admin/datakey/order/:orderId", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { orderId } = req.params;
+    const resp = await fetch(`${DATAKEY_KEYKIT_BASE}/order/${encodeURIComponent(orderId)}`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json(data);
+    }
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка проверки статуса заказа DataKey", details: err.message });
+  }
+});
+
+// Redeem activation code to obtain API key
+app.post("/api/admin/datakey/redeem", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { code, user_code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: "Код активации (code) обязателен" });
+    }
+    const payload: any = { code: code.trim() };
+    if (user_code) {
+      payload.user_code = user_code.trim();
+    }
+    const resp = await fetch(`${DATAKEY_KEYKIT_BASE}/redeem`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json(data);
+    }
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка активации кода DataKey", details: err.message });
+  }
+});
+
+// Bidirectional lookup: find api_key by user_code or user_code by api_key
+app.post("/api/admin/datakey/lookup-key", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { user_code, api_key } = req.body;
+    if (!user_code && !api_key) {
+      return res.status(400).json({ error: "Укажите user_code или api_key для поиска" });
+    }
+    const payload: any = {};
+    if (user_code) payload.user_code = user_code.trim();
+    if (api_key) payload.api_key = api_key.trim();
+
+    const resp = await fetch(`${DATAKEY_KEYKIT_BASE}/lookup-key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json(data);
+    }
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка поиска ключа DataKey", details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
 // Vite and Static File Serving
 // -------------------------------------------------------------
 
