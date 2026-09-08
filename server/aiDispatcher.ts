@@ -109,14 +109,8 @@ export async function callProvider(
       ? 'deepseek-chat'
       : provider === 'openrouter'
       ? 'deepseek/deepseek-r1'
-      : provider === 'datakey'
-      ? 'claude-sonnet-4-6'
       : 'gemini-3.1-flash-lite');
   const apiKey = activeConfig?.api_key || process.env.GEMINI_API_KEY || '';
-
-  if (provider === 'datakey') {
-    return await callDataKey(prompt, systemPrompt, model, apiKey, activeConfig?.base_url);
-  }
 
   if (provider === 'openrouter') {
     return await callOpenRouter(prompt, systemPrompt, model, apiKey, activeConfig?.base_url);
@@ -136,51 +130,6 @@ export async function callProvider(
 
   // Default: Gemini
   return await callGemini(prompt, systemPrompt, model, apiKey);
-}
-
-/**
- * DataKey Provider (OpenAI SDK drop-in API proxy for Claude & GPT models)
- * Base URL: https://ai.datakey.one/v1
- */
-async function callDataKey(
-  prompt: string,
-  systemPrompt: string,
-  model: string,
-  apiKey: string,
-  baseUrl?: string | null
-): Promise<any> {
-  if (!apiKey) {
-    throw new Error('API ключ для DataKey не указан. Настройте его в панели управления администратора.');
-  }
-
-  const cleanBase = (baseUrl || 'https://ai.datakey.one/v1').replace(/\/+$/, '');
-  const url = cleanBase.endsWith('/v1') ? `${cleanBase}/chat/completions` : `${cleanBase}/v1/chat/completions`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model || 'claude-sonnet-4-6',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.6,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`DataKey HTTP ${response.status}: ${errorBody.slice(0, 200)}`);
-  }
-
-  const json = await response.json();
-  const rawText = json?.choices?.[0]?.message?.content || '{}';
-  return extractJsonFromText(rawText);
 }
 
 /**
@@ -419,36 +368,13 @@ export async function callProviderChat(
       ? 'deepseek-chat'
       : provider === 'openrouter'
       ? 'deepseek/deepseek-r1'
-      : provider === 'datakey'
-      ? 'claude-sonnet-4-6'
       : 'gemini-3.1-flash-lite');
   const apiKey = activeConfig?.api_key || process.env.GEMINI_API_KEY || '';
 
   let replyText = '';
 
-  // 1. DataKey (OpenAI drop-in format)
-  if (provider === 'datakey') {
-    if (!apiKey) throw new Error('API-ключ DataKey не указан.');
-    const cleanBase = (activeConfig?.base_url || 'https://ai.datakey.one/v1').replace(/\/+$/, '');
-    const url = cleanBase.endsWith('/v1') ? `${cleanBase}/chat/completions` : `${cleanBase}/v1/chat/completions`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: activeConfig?.temperature ?? 0.7,
-      }),
-    });
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`DataKey HTTP ${response.status}: ${err.slice(0, 200)}`);
-    }
-    const json = await response.json();
-    replyText = json?.choices?.[0]?.message?.content || 'Нет ответа от модели DataKey';
-  }
-  // 2. OpenRouter
-  else if (provider === 'openrouter') {
+  // 1. OpenRouter
+  if (provider === 'openrouter') {
     if (!apiKey) throw new Error('API-ключ OpenRouter не указан.');
     const url = activeConfig?.base_url || 'https://openrouter.ai/api/v1/chat/completions';
     const response = await fetch(url, {

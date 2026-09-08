@@ -255,43 +255,5 @@ export const api = {
       method: 'DELETE',
     });
   },
-
-  // -------------------------------------------------------------
-  // DataKey Keykit Management Methods
-  // -------------------------------------------------------------
-  async getDatakeyUsage(apiKey: string) {
-    return await apiRequest('/api/admin/datakey/usage', {
-      method: 'POST',
-      body: JSON.stringify({ api_key: apiKey }),
-    });
-  },
-
-  async getDatakeyBuyConfig() {
-    return await apiRequest('/api/admin/datakey/buy-config');
-  },
-
-  async createDatakeyCheckout(amountUsd: number, product: string = 'claude') {
-    return await apiRequest('/api/admin/datakey/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ amount_usd: amountUsd, product }),
-    });
-  },
-
-  async getDatakeyOrderStatus(orderId: string) {
-    return await apiRequest(`/api/admin/datakey/order/${encodeURIComponent(orderId)}`);
-  },
-
-  async redeemDatakeyCode(code: string, userCode?: string) {
-    return await apiRequest('/api/admin/datakey/redeem', {
-      method: 'POST',
-      body: JSON.stringify({ code, user_code: userCode }),
-    });
-  },
-
-  async lookupDatakeyKey(params: { user_code?: string; api_key?: string }) {
-    return await apiRequest('/api/admin/datakey/lookup-key', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
-  },
 };
+

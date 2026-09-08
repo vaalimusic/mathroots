@@ -39,7 +39,7 @@ interface AdminPanelModalProps {
   onLoginSuccess?: (user: any) => void;
 }
 
-type ProviderType = 'openrouter' | 'deepseek' | 'yandex' | 'gemini' | 'openai' | 'datakey';
+type ProviderType = 'openrouter' | 'deepseek' | 'yandex' | 'gemini' | 'openai';
 
 interface ProviderPreset {
   provider: ProviderType;
@@ -95,25 +95,6 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     description: 'Любой совместимый OpenAI endpoint (Groq, vLLM, Ollama, Mistral)',
     defaultModel: 'gpt-4o-mini',
     models: ['gpt-4o-mini', 'gpt-4o', 'llama3-70b-8192', 'mistral-large-latest'],
-  },
-  {
-    provider: 'datakey',
-    title: 'DataKey (Claude & GPT)',
-    description: 'API-прокси для Claude 3.5/Sonnet 4.6/Opus и GPT-5.6 с оплатой в рублях',
-    defaultModel: 'claude-sonnet-4-6',
-    models: [
-      'claude-sonnet-4-6',
-      'claude-sonnet-5',
-      'claude-opus-5',
-      'claude-fable-5',
-      'claude-haiku-4-5-20251001',
-      'gpt-5.6',
-      'gpt-5.6-sol',
-      'gpt-5.6-terra',
-      'gpt-5.6-luna',
-      'gpt-5.4-mini',
-    ],
-    defaultBaseUrl: 'https://ai.datakey.one/v1',
   },
 ];
 
@@ -175,29 +156,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; latencyMs?: number } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // DataKey Keykit Hub State
-  const [datakeyUsage, setDatakeyUsage] = useState<any>(null);
-  const [loadingUsage, setLoadingUsage] = useState(false);
-  const [usageError, setUsageError] = useState<string | null>(null);
-
-  // DataKey Buy/Checkout State
-  const [showBuyWidget, setShowBuyWidget] = useState(false);
-  const [buyAmounts, setBuyAmounts] = useState<number[]>([1, 10, 25, 37, 50, 75, 100]);
-  const [selectedAmount, setSelectedAmount] = useState<number>(10);
-  const [selectedProduct, setSelectedProduct] = useState<'claude' | 'openai'>('claude');
-  const [currentOrder, setCurrentOrder] = useState<any>(null);
-  const [orderPolling, setOrderPolling] = useState(false);
-  const [orderStatus, setOrderStatus] = useState<string | null>(null);
-  const [redeemSuccess, setRedeemSuccess] = useState<any>(null);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-  // DataKey Lookup State
-  const [lookupUserCode, setLookupUserCode] = useState('');
-  const [lookupResult, setLookupResult] = useState<any>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -384,120 +343,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setChatMessages((prev) => [...prev, errorMsg]);
     } finally {
       setChatLoading(false);
-    }
-  };
-
-  // Fetch DataKey Balance / Usage
-  const handleCheckDatakeyBalance = async () => {
-    if (!apiKey) {
-      setUsageError('Введите API-ключ DataKey в поле выше для проверки баланса');
-      return;
-    }
-    setLoadingUsage(true);
-    setUsageError(null);
-    try {
-      const res = await api.getDatakeyUsage(apiKey);
-      setDatakeyUsage(res);
-    } catch (err: any) {
-      setUsageError(err.message || 'Не удалось получить баланс. Проверьте ключ.');
-    } finally {
-      setLoadingUsage(false);
-    }
-  };
-
-  // Open DataKey Buy widget
-  const handleOpenBuyWidget = async () => {
-    setShowBuyWidget((prev) => !prev);
-    try {
-      const config = await api.getDatakeyBuyConfig();
-      if (config?.amounts && Array.isArray(config.amounts)) {
-        setBuyAmounts(config.amounts);
-        if (!config.amounts.includes(selectedAmount)) {
-          setSelectedAmount(config.amounts[1] || config.amounts[0] || 10);
-        }
-      }
-    } catch (err) {
-      console.warn('Could not load DataKey buy config:', err);
-    }
-  };
-
-  // Create DataKey order
-  const handleCreateOrder = async () => {
-    setCheckoutLoading(true);
-    setOrderStatus('Создание счета...');
-    setRedeemSuccess(null);
-    try {
-      const order = await api.createDatakeyCheckout(selectedAmount, selectedProduct);
-      setCurrentOrder(order);
-      setOrderStatus('Ожидание оплаты счета...');
-      setOrderPolling(true);
-    } catch (err: any) {
-      alert(`Ошибка создания заказа: ${err.message}`);
-      setOrderStatus(null);
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
-
-  // Polling order status effect
-  useEffect(() => {
-    let timer: any = null;
-    if (orderPolling && currentOrder?.order_id) {
-      timer = setInterval(async () => {
-        try {
-          const statusRes = await api.getDatakeyOrderStatus(currentOrder.order_id);
-          if (statusRes?.invoice_status === 'paid' || statusRes?.invoice_status === 'confirmed') {
-            setOrderStatus('Оплачено! Активируем API ключ...');
-            setOrderPolling(false);
-            if (statusRes.redeem_code) {
-              const redeemRes = await api.redeemDatakeyCode(statusRes.redeem_code);
-              if (redeemRes?.api_key) {
-                setApiKey(redeemRes.api_key);
-                setRedeemSuccess(redeemRes);
-                setOrderStatus('Ключ успешно активирован и сохранен!');
-                // Auto save config with new key
-                api.saveAiConfig({
-                  provider: 'datakey',
-                  model,
-                  api_key: redeemRes.api_key,
-                  base_url: baseUrl || 'https://ai.datakey.one/v1',
-                  temperature,
-                  is_active: true,
-                }).then(() => loadData());
-              }
-            }
-          } else if (statusRes?.invoice_status === 'expired') {
-            setOrderStatus('Счет просрочен. Создайте новый заказ.');
-            setOrderPolling(false);
-          }
-        } catch (err) {
-          console.warn('Order polling error:', err);
-        }
-      }, 10000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [orderPolling, currentOrder, model, baseUrl, temperature]);
-
-  // Lookup key by user_code
-  const handleLookupKey = async () => {
-    if (!lookupUserCode.trim()) return;
-    setLookupLoading(true);
-    setLookupError(null);
-    setLookupResult(null);
-    try {
-      const res = await api.lookupDatakeyKey({ user_code: lookupUserCode.trim() });
-      if (res?.api_key) {
-        setLookupResult(res);
-        setApiKey(res.api_key);
-      } else {
-        setLookupError('Ключ по данному коду не найден.');
-      }
-    } catch (err: any) {
-      setLookupError(err.message || 'Ошибка поиска ключа');
-    } finally {
-      setLookupLoading(false);
     }
   };
 
@@ -787,8 +632,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       placeholder={
                         selectedProvider === 'gemini'
                           ? 'AIzaSy... (или оставьте пустым для переменной окружения)'
-                          : selectedProvider === 'datakey'
-                          ? 'sk-YOUR-DATAKEY (купите ниже или вставьте существующий)'
                           : 'sk-or-v1-... / AQVN...'
                       }
                       className="w-full pl-3.5 pr-10 py-2.5 bg-[#0e1222] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition-colors"
@@ -802,270 +645,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </button>
                   </div>
                 </div>
-
-                {/* DataKey Dedicated Hub (Balance, Buy in RUB, Lookup Key) */}
-                {selectedProvider === 'datakey' && (
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-purple-950/30 to-slate-900/60 border border-indigo-500/30 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs">
-                          <Coins className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>DataKey Hub • Баланс и Покупка в Рублях</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                              Официальный шлюз
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-slate-400">
-                            Все модели Claude & GPT по одному ключу без зарубежных банковских карт
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleCheckDatakeyBalance}
-                          disabled={loadingUsage}
-                          className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-indigo-300 text-xs font-semibold transition-colors flex items-center gap-1.5 border border-indigo-500/30"
-                        >
-                          <Coins className="w-3.5 h-3.5" />
-                          <span>{loadingUsage ? 'Проверка...' : 'Проверить баланс'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleOpenBuyWidget}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-lg shadow-emerald-600/20"
-                        >
-                          <CreditCard className="w-3.5 h-3.5" />
-                          <span>{showBuyWidget ? 'Скрыть покупку' : 'Купить / Пополнить ключ'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Balance Display Card */}
-                    {datakeyUsage && (
-                      <div className="p-3.5 rounded-xl bg-black/40 border border-emerald-500/30 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
-                        <div>
-                          <div className="text-[10px] text-slate-400">Остаток баланса:</div>
-                          <div className="text-sm font-bold text-emerald-300 font-mono">
-                            ${datakeyUsage.remaining_usd?.toFixed(2) || '0.00'} USD
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-slate-400">Расход сегодня:</div>
-                          <div className="text-sm font-bold text-slate-200 font-mono">
-                            ${datakeyUsage.today?.cost_usd?.toFixed(3) || '0.000'}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-slate-400">Запросов сегодня:</div>
-                          <div className="text-sm font-bold text-indigo-300 font-mono">
-                            {datakeyUsage.today?.requests || 0}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-slate-400">Токенов сегодня:</div>
-                          <div className="text-sm font-bold text-purple-300 font-mono">
-                            {datakeyUsage.today?.tokens || 0}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {usageError && (
-                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                        {usageError}
-                      </div>
-                    )}
-
-                    {/* Buy / Checkout Flow Widget */}
-                    {showBuyWidget && (
-                      <div className="p-4 rounded-xl bg-black/50 border border-white/[0.08] space-y-3 animate-in fade-in duration-200">
-                        <div className="text-xs font-bold text-white flex items-center justify-between">
-                          <span>Покупка нового ключа или пополнение счета</span>
-                          <span className="text-[10px] text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
-                            Оплата в рублях (СБП, Карты РФ, Крипта)
-                          </span>
-                        </div>
-
-                        {/* Product selection */}
-                        <div className="flex gap-3">
-                          <label className="text-xs text-slate-300 flex items-center gap-1.5 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="datakey_product"
-                              value="claude"
-                              checked={selectedProduct === 'claude'}
-                              onChange={() => setSelectedProduct('claude')}
-                              className="accent-indigo-500"
-                            />
-                            <span className="font-semibold">Claude (Anthropic)</span>
-                          </label>
-                          <label className="text-xs text-slate-300 flex items-center gap-1.5 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="datakey_product"
-                              value="openai"
-                              checked={selectedProduct === 'openai'}
-                              onChange={() => setSelectedProduct('openai')}
-                              className="accent-indigo-500"
-                            />
-                            <span className="font-semibold">GPT-5.6 (OpenAI)</span>
-                          </label>
-                        </div>
-
-                        {/* Amount selector chips */}
-                        <div className="space-y-1">
-                          <div className="text-[11px] text-slate-400">Выберите номинал баланса:</div>
-                          <div className="flex flex-wrap gap-2">
-                            {buyAmounts.map((amt) => (
-                              <button
-                                key={amt}
-                                type="button"
-                                onClick={() => setSelectedAmount(amt)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all border ${
-                                  selectedAmount === amt
-                                    ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
-                                    : 'bg-white/[0.04] text-slate-300 hover:text-white border-white/[0.08]'
-                                }`}
-                              >
-                                ${amt} USD
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Create Order Button */}
-                        {!currentOrder && (
-                          <button
-                            type="button"
-                            onClick={handleCreateOrder}
-                            disabled={checkoutLoading}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors flex items-center gap-2 shadow-lg shadow-indigo-600/30"
-                          >
-                            <CreditCard className="w-4 h-4" />
-                            <span>{checkoutLoading ? 'Создание счета...' : `Сформировать счет на $${selectedAmount}`}</span>
-                          </button>
-                        )}
-
-                        {/* Payment Order Active View */}
-                        {currentOrder && (
-                          <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-2.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-white">
-                                Заказ #{currentOrder.order_id?.slice(0, 10)}...
-                              </span>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                                <Clock className="w-3 h-3 animate-spin" />
-                                {orderStatus || 'Ожидание оплаты'}
-                              </span>
-                            </div>
-
-                            <div className="p-2.5 rounded-lg bg-black/60 border border-white/[0.08] text-xs space-y-1.5">
-                              <div className="text-[11px] text-amber-200">
-                                ⚠️ Оплата производится <strong>человеком</strong> в браузере. Нажмите ссылку ниже:
-                              </div>
-                              {currentOrder.payment_url && (
-                                <a
-                                  href={currentOrder.payment_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md"
-                                >
-                                  <span>Оплатить по ссылке (${selectedAmount} USD)</span>
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              )}
-                            </div>
-
-                            <div className="text-[10px] text-slate-400 flex items-center justify-between">
-                              <span>Система опрашивает статус каждые 10 секунд. После оплаты ключ автоматически активируется.</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCurrentOrder(null);
-                                  setOrderPolling(false);
-                                  setOrderStatus(null);
-                                }}
-                                className="text-slate-400 hover:text-white underline ml-2 shrink-0"
-                              >
-                                Отменить
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Redeem Success Card */}
-                        {redeemSuccess && (
-                          <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs space-y-2 animate-in fade-in duration-200">
-                            <div className="flex items-center gap-2 text-emerald-300 font-bold">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                              <span>Ключ DataKey успешно активирован!</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
-                              <div className="flex justify-between items-center p-2 rounded bg-black/50">
-                                <span className="text-slate-400">API Key:</span>
-                                <span className="text-emerald-300 font-bold">{redeemSuccess.api_key?.slice(0, 15)}...</span>
-                              </div>
-                              <div className="flex justify-between items-center p-2 rounded bg-black/50">
-                                <span className="text-slate-400">User Code (для пополнений):</span>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-amber-300 font-bold">{redeemSuccess.user_code}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => copyToClipboard(redeemSuccess.user_code, 'user_code')}
-                                    className="p-1 hover:text-white text-slate-400"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Lookup Key by user_code */}
-                    <div className="pt-2 border-t border-white/[0.06] flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] text-slate-400">Забыли API-ключ, но есть код аккаунта (User Code)?</span>
-                      <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                        <input
-                          type="text"
-                          value={lookupUserCode}
-                          onChange={(e) => setLookupUserCode(e.target.value)}
-                          placeholder="Код аккаунта, например: ABC-DEF-GHI"
-                          className="px-2.5 py-1.5 bg-black/50 border border-white/[0.08] rounded-lg text-white text-xs font-mono flex-1 focus:outline-none focus:border-indigo-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleLookupKey}
-                          disabled={lookupLoading || !lookupUserCode.trim()}
-                          className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-slate-200 transition-colors border border-white/[0.08] flex items-center gap-1 shrink-0"
-                        >
-                          <Search className="w-3 h-3" />
-                          <span>{lookupLoading ? 'Поиск...' : 'Найти ключ'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {lookupResult && (
-                      <div className="p-2 rounded bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center justify-between">
-                        <span>Ключ найден и подставлен в форму: <strong>{lookupResult.api_key?.slice(0, 18)}...</strong></span>
-                        <span className="text-slate-400">Нажмите «Сохранить» внизу</span>
-                      </div>
-                    )}
-                    {lookupError && (
-                      <div className="text-[11px] text-rose-300">
-                        {lookupError}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Yandex Folder ID if required */}
                 {currentPreset.requiresFolderId && (
@@ -1085,7 +664,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 )}
 
                 {/* Custom Base URL (optional) */}
-                {(selectedProvider === 'openrouter' || selectedProvider === 'deepseek' || selectedProvider === 'openai' || selectedProvider === 'datakey') && (
+                {(selectedProvider === 'openrouter' || selectedProvider === 'deepseek' || selectedProvider === 'openai') && (
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                       <span>Base URL (Опционально):</span>
