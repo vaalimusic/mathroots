@@ -98,6 +98,89 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   },
 ];
 
+export interface ProxyPreset {
+  name: string;
+  url: string;
+  provider: ProviderType;
+  description: string;
+  defaultModel?: string;
+  badge?: string;
+  homepage?: string;
+}
+
+export const PROXY_PRESETS: ProxyPreset[] = [
+  {
+    name: 'ProxyAPI (РФ / Без VPN)',
+    url: 'https://api.proxyapi.ru/openai/v1',
+    provider: 'openai',
+    description: 'Прямой доступ к GPT-4o, Claude 3.5, DeepSeek из РФ без VPN. Оплата картами РФ и СБП.',
+    defaultModel: 'gpt-4o-mini',
+    badge: 'Для РФ / Без VPN',
+    homepage: 'https://proxyapi.ru',
+  },
+  {
+    name: 'VseGPT (РФ агрегатор)',
+    url: 'https://api.vsegpt.ru/v1',
+    provider: 'openai',
+    description: 'Единый российский шлюз к 100+ мировым моделям с оплатой в рублях.',
+    defaultModel: 'openai/gpt-4o-mini',
+    badge: 'Рубли / СБП',
+    homepage: 'https://vsegpt.ru',
+  },
+  {
+    name: 'Groq Cloud (Быстрый LPU)',
+    url: 'https://api.groq.com/openai/v1',
+    provider: 'openai',
+    description: 'Сверхбыстрый инференс LLaMA 3.3 и DeepSeek на процессорах LPU от Groq.',
+    defaultModel: 'llama-3.3-70b-versatile',
+    badge: 'Сверхбыстрый',
+    homepage: 'https://console.groq.com',
+  },
+  {
+    name: 'OpenRouter Gateway',
+    url: 'https://openrouter.ai/api/v1',
+    provider: 'openrouter',
+    description: 'Мульти-провайдер с доступом к DeepSeek R1, Claude, GPT, Gemini через один счет.',
+    defaultModel: 'deepseek/deepseek-r1',
+    badge: 'Мульти-модели',
+    homepage: 'https://openrouter.ai',
+  },
+  {
+    name: 'Официальный OpenAI',
+    url: 'https://api.openai.com/v1',
+    provider: 'openai',
+    description: 'Прямое подключение к OpenAI API (требует зарубежную карту и IP без блокировок).',
+    defaultModel: 'gpt-4o-mini',
+    homepage: 'https://platform.openai.com',
+  },
+  {
+    name: 'DeepSeek Официальный',
+    url: 'https://api.deepseek.com',
+    provider: 'deepseek',
+    description: 'Прямой доступ к официальному API DeepSeek (deepseek-chat и deepseek-reasoner).',
+    defaultModel: 'deepseek-chat',
+    homepage: 'https://platform.deepseek.com',
+  },
+  {
+    name: 'Ollama (Локальный ПК)',
+    url: 'http://localhost:11434/v1',
+    provider: 'openai',
+    description: 'Запуск открытых нейросетей локально на вашем компьютере без интернета.',
+    defaultModel: 'llama3:latest',
+    badge: 'Без интернета',
+    homepage: 'https://ollama.com',
+  },
+  {
+    name: 'LM Studio (Локально)',
+    url: 'http://localhost:1234/v1',
+    provider: 'openai',
+    description: 'Локальный шлюз нейросетей через приложение LM Studio с OpenAI API форматом.',
+    defaultModel: 'local-model',
+    badge: 'Локально',
+    homepage: 'https://lmstudio.ai',
+  },
+];
+
 export type AdminTab = 'providers' | 'chat_test' | 'cache' | 'system';
 
 export interface ChatMessage {
@@ -663,13 +746,30 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </div>
                 )}
 
-                {/* Custom Base URL (optional) */}
-                {(selectedProvider === 'openrouter' || selectedProvider === 'deepseek' || selectedProvider === 'openai') && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                      <span>Base URL (Опционально):</span>
-                      <span className="text-[11px] text-slate-500">По умолчанию: {currentPreset.defaultBaseUrl || 'https://api.openai.com/v1'}</span>
+                {/* Base URL, Proxies & Mirrors Hub */}
+                <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Base URL (API Endpoint / Прокси / Зеркало):</span>
                     </label>
+                    <div className="flex items-center gap-2">
+                      {baseUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setBaseUrl('')}
+                          className="text-[10px] text-slate-400 hover:text-rose-300 underline transition-colors"
+                        >
+                          Сбросить к умолчанию
+                        </button>
+                      )}
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        По умолчанию: {currentPreset.defaultBaseUrl || 'https://api.openai.com/v1'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative">
                     <input
                       type="text"
                       value={baseUrl}
@@ -678,7 +778,108 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       className="w-full px-3.5 py-2.5 bg-[#0e1222] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition-colors"
                     />
                   </div>
-                )}
+
+                  {/* Preset Proxy Chips */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Zap className="w-3 h-3 text-amber-400" />
+                        Быстрые пресеты прокси и API-шлюзов:
+                      </span>
+                      <span className="text-[10px] text-slate-500">Кликните для авто-заполнения</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {PROXY_PRESETS.map((preset) => {
+                        const isSelected = baseUrl.trim().replace(/\/+$/, '') === preset.url.replace(/\/+$/, '');
+                        return (
+                          <div
+                            key={preset.name}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              isSelected
+                                ? 'bg-indigo-600/20 border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                                : 'bg-black/30 hover:bg-white/[0.04] border-white/[0.06]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProvider(preset.provider);
+                                  setBaseUrl(preset.url);
+                                  if (preset.defaultModel) {
+                                    setModel(preset.defaultModel);
+                                  }
+                                }}
+                                className="font-semibold text-xs text-white hover:text-indigo-300 transition-colors text-left flex items-center gap-1.5 flex-1"
+                              >
+                                <span>{preset.name}</span>
+                                {preset.badge && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                    {preset.badge}
+                                  </span>
+                                )}
+                              </button>
+
+                              {preset.homepage && (
+                                <a
+                                  href={preset.homepage}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-slate-400 hover:text-emerald-400 p-0.5"
+                                  title={`Перейти на сайт ${preset.name}`}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedProvider(preset.provider);
+                                setBaseUrl(preset.url);
+                                if (preset.defaultModel) {
+                                  setModel(preset.defaultModel);
+                                }
+                              }}
+                              className="w-full text-left"
+                            >
+                              <div className="text-[10px] text-slate-400 line-clamp-1 mb-1 font-sans">
+                                {preset.description}
+                              </div>
+                              <div className="text-[10px] text-emerald-400/90 font-mono truncate">
+                                {preset.url}
+                              </div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Friendly Helper Guide */}
+                  <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 text-xs space-y-1.5 text-slate-300">
+                    <div className="font-bold text-white text-[11px] flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Что делать, если официальный OpenAI не работает (403 Forbidden / Блокировка)?</span>
+                    </div>
+                    <ol className="list-decimal list-inside text-[11px] space-y-1 text-slate-300">
+                      <li>
+                        Выберите провайдера <strong>OpenAI / Custom Compatible</strong>.
+                      </li>
+                      <li>
+                        Кликните по пресету <strong>ProxyAPI (РФ / Без VPN)</strong> или <strong>VseGPT</strong> (или вставьте адрес вашего личного прокси / Cloudflare Worker).
+                      </li>
+                      <li>
+                        Вставьте API-ключ, выданный вашим прокси-сервисом, в поле ключа выше.
+                      </li>
+                      <li>
+                        Нажмите кнопку <strong>«Чат-тест модели»</strong> ниже — система мгновенно проверит ответ через прокси!
+                      </li>
+                    </ol>
+                  </div>
+                </div>
 
                 {/* Temperature */}
                 <div className="space-y-1.5 pt-1">

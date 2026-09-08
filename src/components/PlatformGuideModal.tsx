@@ -736,7 +736,20 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
                       <span className="text-[10px] text-emerald-300 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/20">Универсальные</span>
                     </div>
                     <div className="text-xs text-slate-400">
-                      Поддержка прямого Gemini API (`gemini-1.5-pro/flash`) и любых OpenAI-совместимых шлюзов с кастомным base URL.
+                      Поддержка прямого Gemini API (`gemini-2.5/3.1-flash`) и любых OpenAI-совместимых шлюзов с кастомным base URL.
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-950/30 via-purple-950/20 to-slate-900/40 border border-indigo-500/30 space-y-1.5 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>Проксирование & Кастомные Base URL (Обход блокировок)</span>
+                        <span className="text-[10px] text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30">Пресеты в 1 клик</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 font-mono">ProxyAPI • VseGPT • Groq • Ollama</span>
+                    </div>
+                    <div className="text-xs text-slate-300">
+                      Если прямой доступ к официальному OpenAI заблокирован из-за региональных ограничений (403 Forbidden / Cloudflare), в админ-панели можно в 1 клик переключить <strong>Base URL</strong> на любой совместимый шлюз: <strong>ProxyAPI</strong> (карты РФ / СБП), <strong>VseGPT</strong>, <strong>Groq</strong> (сверхбыстрый LPU) или локальный <strong>Ollama / LM Studio</strong> без интернета.
                     </div>
                   </div>
                 </div>

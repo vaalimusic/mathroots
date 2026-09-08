@@ -133,6 +133,17 @@ export async function callProvider(
 }
 
 /**
+ * Normalizes any Base URL (proxy, mirror, custom gateway) to standard /chat/completions endpoint.
+ */
+export function getChatCompletionsUrl(baseUrl?: string | null, fallback = 'https://api.openai.com/v1'): string {
+  const raw = (baseUrl || fallback).trim().replace(/\/+$/, '');
+  if (raw.endsWith('/chat/completions')) {
+    return raw;
+  }
+  return `${raw}/chat/completions`;
+}
+
+/**
  * OpenRouter Provider
  */
 async function callOpenRouter(prompt: string, systemPrompt: string, model: string, apiKey: string, baseUrl?: string | null): Promise<any> {
@@ -140,7 +151,7 @@ async function callOpenRouter(prompt: string, systemPrompt: string, model: strin
     throw new Error('API ключ для OpenRouter не указан. Настройте его в панели управления администратора.');
   }
 
-  const url = baseUrl || 'https://openrouter.ai/api/v1/chat/completions';
+  const url = getChatCompletionsUrl(baseUrl, 'https://openrouter.ai/api/v1');
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -178,7 +189,7 @@ async function callDeepSeek(prompt: string, systemPrompt: string, model: string,
     throw new Error('API ключ для DeepSeek не указан. Настройте его в панели управления администратора.');
   }
 
-  const url = `${baseUrl || 'https://api.deepseek.com'}/chat/completions`;
+  const url = getChatCompletionsUrl(baseUrl, 'https://api.deepseek.com');
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -250,10 +261,10 @@ async function callYandexGpt(prompt: string, systemPrompt: string, model: string
 }
 
 /**
- * Custom OpenAI-compatible Provider (Groq, Ollama, LocalAI, vLLM, etc.)
+ * Custom OpenAI-compatible Provider (Groq, Ollama, LocalAI, vLLM, ProxyAPI, etc.)
  */
 async function callOpenAiCompatible(prompt: string, systemPrompt: string, model: string, apiKey: string, baseUrl?: string | null): Promise<any> {
-  const url = `${baseUrl || 'https://api.openai.com/v1'}/chat/completions`;
+  const url = getChatCompletionsUrl(baseUrl, 'https://api.openai.com/v1');
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -376,7 +387,7 @@ export async function callProviderChat(
   // 1. OpenRouter
   if (provider === 'openrouter') {
     if (!apiKey) throw new Error('API-ключ OpenRouter не указан.');
-    const url = activeConfig?.base_url || 'https://openrouter.ai/api/v1/chat/completions';
+    const url = getChatCompletionsUrl(activeConfig?.base_url, 'https://openrouter.ai/api/v1');
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -401,7 +412,7 @@ export async function callProviderChat(
   // 3. DeepSeek
   else if (provider === 'deepseek') {
     if (!apiKey) throw new Error('API-ключ DeepSeek не указан.');
-    const url = `${activeConfig?.base_url || 'https://api.deepseek.com'}/chat/completions`;
+    const url = getChatCompletionsUrl(activeConfig?.base_url, 'https://api.deepseek.com');
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -418,9 +429,9 @@ export async function callProviderChat(
     const json = await response.json();
     replyText = json?.choices?.[0]?.message?.content || 'Нет ответа от модели DeepSeek';
   }
-  // 4. OpenAI / Custom
+  // 4. OpenAI / Custom / Proxy
   else if (provider === 'openai') {
-    const url = `${activeConfig?.base_url || 'https://api.openai.com/v1'}/chat/completions`;
+    const url = getChatCompletionsUrl(activeConfig?.base_url, 'https://api.openai.com/v1');
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey || 'no-key'}` },
