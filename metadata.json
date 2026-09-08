@@ -1,0 +1,8 @@
+{
+  "name": "ALPHA MathRoots",
+  "description": "Интерактивная бесконечная карта математических корней, семантический зум, механика «Почему?», отладчик математического мышления и конструктор деревьев задач.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mathroots-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mathroots_secure_pass_2026}
+      POSTGRES_DB: ${DB_NAME:-mathroots}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-mathroots}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mathroots-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mathroots-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-mathroots_secure_pass_2026}@postgres:5432/${DB_NAME:-mathroots}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-mathroots_prod_jwt_super_secret_key_2026}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mathroots-net
+
+volumes:
+  pgdata:
+    name: mathroots_pgdata
+
+networks:
+  mathroots-net:
+    name: mathroots_network
+    driver: bridge
