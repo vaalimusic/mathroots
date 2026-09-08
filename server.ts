@@ -13,9 +13,15 @@ import {
   hashPassword,
   comparePassword,
   requireAuth,
+  requireAdmin,
   optionalAuth,
   AuthRequest,
 } from "./server/auth";
+import {
+  executeAiWithCache,
+  callProvider,
+  testAiProviderConnection,
+} from "./server/aiDispatcher";
 
 dotenv.config();
 
@@ -281,19 +287,20 @@ app.post("/api/auth/register", async (req, res) => {
 // Login
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email и пароль обязательны" });
+    const accountIdentifier = req.body.email || req.body.login;
+    const { password } = req.body;
+    if (!accountIdentifier || !password) {
+      return res.status(400).json({ error: "Логин/Email и пароль обязательны" });
     }
 
-    const user = await db.findUserByEmail(email);
+    const user = await db.findUserByEmail(accountIdentifier);
     if (!user || !user.password_hash) {
-      return res.status(401).json({ error: "Неверный email или пароль" });
+      return res.status(401).json({ error: "Неверный логин или пароль" });
     }
 
     const isMatch = await comparePassword(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ error: "Неверный email или пароль" });
+      return res.status(401).json({ error: "Неверный логин или пароль" });
     }
 
     const token = generateToken(user);
@@ -475,12 +482,6 @@ app.post("/api/ai/decompose", async (req, res) => {
       return res.status(400).json({ error: "Missing problem text" });
     }
 
-    const ai = getGeminiClient();
-    if (!ai) {
-      const fallbackTree = createFallbackTree(problem);
-      return res.json({ success: true, tree: fallbackTree, fallback: true });
-    }
-
     const prompt = `
 Ты — математический архитектор и создатель карт знаний MathRoots ("Любая сложная задача имеет корни").
 Задача пользователя: "${problem}".
@@ -522,14 +523,32 @@ app.post("/api/ai/decompose", async (req, res) => {
 }
 `;
 
-    try {
-      const data = await generateJsonWithFallback(prompt, ai);
-      return res.json({ success: true, tree: data });
-    } catch (genErr) {
-      console.warn("Gemini cascade failed, using high-fidelity fallback:", genErr);
-      const fallbackTree = createFallbackTree(problem);
-      return res.json({ success: true, tree: fallbackTree, fallback: true });
-    }
+    const cacheResult = await executeAiWithCache(
+      "decompose",
+      { problem: problem.trim().toLowerCase(), masteredTopics: [...masteredTopics].sort() },
+      `Декомпозиция: ${problem}`,
+      async (activeConfig) => {
+        try {
+          return await callProvider(
+            prompt,
+            "Ты — математический архитектор MathRoots. Отвечай строго валидным JSON.",
+            activeConfig
+          );
+        } catch (genErr) {
+          console.warn("[AI Dispatcher] Provider call failed, using high-fidelity fallback:", genErr);
+          return createFallbackTree(problem);
+        }
+      }
+    );
+
+    return res.json({
+      success: true,
+      tree: cacheResult.data,
+      _cached: cacheResult.cached,
+      _provider: cacheResult.provider,
+      _model: cacheResult.model,
+      _hitCount: cacheResult.hitCount,
+    });
   } catch (error: any) {
     console.error("Error in /api/ai/decompose:", error);
     const fallbackTree = createFallbackTree(req.body?.problem || "Математическая задача");
@@ -556,11 +575,6 @@ app.post("/api/ai/explain-why", async (req, res) => {
   };
 
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
-      return res.json({ success: true, explanation: fallbackExplanation, fallback: true });
-    }
-
     const personaDesc = personaInstructions[level] || personaInstructions.school;
     const prompt = `
 Ты — интеллектуальный преподаватель MathRoots.
@@ -582,13 +596,37 @@ app.post("/api/ai/explain-why", async (req, res) => {
 }
 `;
 
-    try {
-      const data = await generateJsonWithFallback(prompt, ai);
-      return res.json({ success: true, explanation: data });
-    } catch (genErr) {
-      console.warn("Gemini cascade failed for explain-why, returning fallback:", genErr);
-      return res.json({ success: true, explanation: fallbackExplanation, fallback: true });
-    }
+    const cacheResult = await executeAiWithCache(
+      "explain_why",
+      {
+        nodeTitle: (nodeTitle || "").trim().toLowerCase(),
+        formula: (formula || "").trim(),
+        level,
+        stepContext: (stepContext || "").trim(),
+      },
+      `Объяснение: ${nodeTitle} (${level})`,
+      async (activeConfig) => {
+        try {
+          return await callProvider(
+            prompt,
+            "Ты — интеллектуальный преподаватель MathRoots. Отвечай только валидным JSON.",
+            activeConfig
+          );
+        } catch (genErr) {
+          console.warn("[AI Dispatcher] Provider call failed for explain-why, returning fallback:", genErr);
+          return fallbackExplanation;
+        }
+      }
+    );
+
+    return res.json({
+      success: true,
+      explanation: cacheResult.data,
+      _cached: cacheResult.cached,
+      _provider: cacheResult.provider,
+      _model: cacheResult.model,
+      _hitCount: cacheResult.hitCount,
+    });
   } catch (error: any) {
     console.error("Error in /api/ai/explain-why:", error);
     res.json({ success: true, explanation: fallbackExplanation, fallback: true });
@@ -624,11 +662,6 @@ app.post("/api/ai/diagnose-stuck", async (req, res) => {
   };
 
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
-      return res.json({ success: true, diagnosis: fallbackDiagnosis, fallback: true });
-    }
-
     const prompt = `
 Ты — математический отладчик когнитивных пробелов MathRoots.
 Пользователь застрял на узле "${nodeTitle}".
@@ -648,27 +681,119 @@ app.post("/api/ai/diagnose-stuck", async (req, res) => {
 }
 `;
 
-    try {
-      const rawData = await generateJsonWithFallback(prompt, ai);
-      const data = {
-        gapConcept: rawData.gapConcept || rawData.missingFoundationalConcept || fallbackDiagnosis.gapConcept,
-        rootCauseAnalysis: rawData.rootCauseAnalysis || rawData.explanation || fallbackDiagnosis.rootCauseAnalysis,
-        pathFromRoot: Array.isArray(rawData.pathFromRoot) ? rawData.pathFromRoot : fallbackDiagnosis.pathFromRoot,
-        recommendedAction: rawData.recommendedAction || fallbackDiagnosis.recommendedAction,
-        targetNodeId: rawData.targetNodeId || rawData.recommendedPrerequisiteNodeId || fallbackDiagnosis.targetNodeId,
-        missingFoundationalConcept: rawData.gapConcept || rawData.missingFoundationalConcept || fallbackDiagnosis.gapConcept,
-        explanation: rawData.rootCauseAnalysis || rawData.explanation || fallbackDiagnosis.rootCauseAnalysis,
-        recommendedPrerequisiteNodeId: rawData.targetNodeId || rawData.recommendedPrerequisiteNodeId || fallbackDiagnosis.targetNodeId,
-        remedialStepQuestions: Array.isArray(rawData.pathFromRoot) ? rawData.pathFromRoot : fallbackDiagnosis.pathFromRoot,
-      };
-      return res.json({ success: true, diagnosis: data });
-    } catch (genErr) {
-      console.warn("Gemini cascade failed for diagnose-stuck, returning fallback:", genErr);
-      return res.json({ success: true, diagnosis: fallbackDiagnosis, fallback: true });
-    }
+    const cacheResult = await executeAiWithCache(
+      "diagnose_stuck",
+      {
+        nodeTitle: nodeTitle.trim().toLowerCase(),
+        formula: formula.trim(),
+        mistakeContext: mistakeContext.trim(),
+      },
+      `Диагностика: ${nodeTitle}`,
+      async (activeConfig) => {
+        try {
+          const rawData = await callProvider(
+            prompt,
+            "Ты — отладчик когнитивных пробелов MathRoots. Отвечай строго валидным JSON.",
+            activeConfig
+          );
+          return {
+            gapConcept: rawData.gapConcept || rawData.missingFoundationalConcept || fallbackDiagnosis.gapConcept,
+            rootCauseAnalysis: rawData.rootCauseAnalysis || rawData.explanation || fallbackDiagnosis.rootCauseAnalysis,
+            pathFromRoot: Array.isArray(rawData.pathFromRoot) ? rawData.pathFromRoot : fallbackDiagnosis.pathFromRoot,
+            recommendedAction: rawData.recommendedAction || fallbackDiagnosis.recommendedAction,
+            targetNodeId: rawData.targetNodeId || rawData.recommendedPrerequisiteNodeId || fallbackDiagnosis.targetNodeId,
+            missingFoundationalConcept: rawData.gapConcept || rawData.missingFoundationalConcept || fallbackDiagnosis.gapConcept,
+            explanation: rawData.rootCauseAnalysis || rawData.explanation || fallbackDiagnosis.rootCauseAnalysis,
+            recommendedPrerequisiteNodeId: rawData.targetNodeId || rawData.recommendedPrerequisiteNodeId || fallbackDiagnosis.targetNodeId,
+            remedialStepQuestions: Array.isArray(rawData.pathFromRoot) ? rawData.pathFromRoot : fallbackDiagnosis.pathFromRoot,
+          };
+        } catch (genErr) {
+          console.warn("[AI Dispatcher] Provider call failed for diagnose-stuck, returning fallback:", genErr);
+          return fallbackDiagnosis;
+        }
+      }
+    );
+
+    return res.json({
+      success: true,
+      diagnosis: cacheResult.data,
+      _cached: cacheResult.cached,
+      _provider: cacheResult.provider,
+      _model: cacheResult.model,
+      _hitCount: cacheResult.hitCount,
+    });
   } catch (error: any) {
     console.error("Error in /api/ai/diagnose-stuck:", error);
     res.json({ success: true, diagnosis: fallbackDiagnosis, fallback: true });
+  }
+});
+
+// -------------------------------------------------------------
+// Admin Endpoints (Protected by requireAdmin)
+// -------------------------------------------------------------
+
+// Get AI configs (active provider and all configured providers)
+app.get("/api/admin/ai/configs", requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const active = await db.getActiveAiConfig();
+    const all = await db.getAllAiConfigs();
+    res.json({ success: true, active, all });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка загрузки настроек ИИ", details: err.message });
+  }
+});
+
+// Save / update AI config and set active
+app.post("/api/admin/ai/configs", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { provider, model, api_key, base_url, folder_id, temperature, max_tokens, is_active } = req.body;
+    if (!provider || !model) {
+      return res.status(400).json({ error: "Поля provider и model обязательны" });
+    }
+    const saved = await db.saveAiConfig({
+      provider,
+      model,
+      api_key,
+      base_url,
+      folder_id,
+      temperature,
+      max_tokens,
+      is_active: is_active ?? true,
+    });
+    res.json({ success: true, config: saved });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка сохранения настроек ИИ", details: err.message });
+  }
+});
+
+// Test connection with specified AI config
+app.post("/api/admin/ai/test", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const result = await testAiProviderConnection(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// AI Cache statistics and recent entries
+app.get("/api/admin/cache/stats", requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const stats = await db.getAiCacheStats();
+    const recent = await db.getRecentCacheEntries(20);
+    res.json({ success: true, stats, recent });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка загрузки статистики кэша", details: err.message });
+  }
+});
+
+// Flush AI response cache
+app.delete("/api/admin/cache", requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    await db.clearAiCache();
+    res.json({ success: true, message: "Кэш ответов ИИ успешно очищен" });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка очистки кэша", details: err.message });
   }
 });
 
@@ -679,6 +804,11 @@ app.post("/api/ai/diagnose-stuck", async (req, res) => {
 async function startServer() {
   // Initialize Database
   await initDb();
+
+  // Ensure Admin user exists with login 'admin' and password 'SETUP_ON_FIRST_LOGIN'
+  await db.ensureAdminUser("admin", "SETUP_ON_FIRST_LOGIN").catch((err) => {
+    console.warn("[DB] Could not seed admin user:", err);
+  });
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

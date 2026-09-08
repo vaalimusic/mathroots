@@ -1,5 +1,6 @@
 import { Pool, QueryResult } from 'pg';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 export interface DbUser {
   id: string;
@@ -10,6 +11,34 @@ export interface DbUser {
   is_anonymous: boolean;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface DbAiConfig {
+  id: string;
+  provider: 'openrouter' | 'deepseek' | 'yandex' | 'gemini' | 'openai';
+  model: string;
+  api_key: string | null;
+  base_url: string | null;
+  folder_id: string | null;
+  temperature: number;
+  max_tokens: number;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface DbAiCache {
+  id: string;
+  cache_key: string;
+  prompt_type: string;
+  provider: string;
+  model: string;
+  input_summary: string;
+  response_json: any;
+  hit_count: number;
+  saved_tokens_estimate: number;
+  created_at: Date;
+  last_accessed_at: Date;
 }
 
 export interface DbCustomTree {
@@ -49,6 +78,8 @@ const inMemoryStore = {
   workoutAttempts: [] as any[],
   cognitiveGaps: new Map<string, any>(),
   canvasLayouts: new Map<string, any>(),
+  aiConfigs: new Map<string, DbAiConfig>(),
+  aiResponseCache: new Map<string, DbAiCache>(),
 };
 
 export async function initDb(): Promise<boolean> {
@@ -149,9 +180,39 @@ export async function initDb(): Promise<boolean> {
         CONSTRAINT uq_user_tree_layout UNIQUE (user_id, tree_id)
       );
 
+      CREATE TABLE IF NOT EXISTS ai_provider_configs (
+        id VARCHAR(64) PRIMARY KEY,
+        provider VARCHAR(50) NOT NULL,
+        model VARCHAR(100) NOT NULL,
+        api_key TEXT,
+        base_url TEXT,
+        folder_id TEXT,
+        temperature REAL DEFAULT 0.7,
+        max_tokens INT DEFAULT 4000,
+        is_active BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_response_cache (
+        id VARCHAR(64) PRIMARY KEY,
+        cache_key VARCHAR(128) UNIQUE NOT NULL,
+        prompt_type VARCHAR(50) NOT NULL,
+        provider VARCHAR(50) NOT NULL,
+        model VARCHAR(100) NOT NULL,
+        input_summary TEXT,
+        response_json JSONB NOT NULL,
+        hit_count INT DEFAULT 1,
+        saved_tokens_estimate INT DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_accessed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE INDEX IF NOT EXISTS idx_node_masteries_user ON node_masteries(user_id);
       CREATE INDEX IF NOT EXISTS idx_custom_trees_user ON custom_trees(user_id);
       CREATE INDEX IF NOT EXISTS idx_custom_trees_slug ON custom_trees(share_slug);
+      CREATE INDEX IF NOT EXISTS idx_ai_cache_key ON ai_response_cache(cache_key);
+      CREATE INDEX IF NOT EXISTS idx_ai_cache_type ON ai_response_cache(prompt_type);
     `);
 
     client.release();
@@ -225,14 +286,96 @@ export const db = {
   },
 
   async findUserByEmail(email: string): Promise<DbUser | null> {
+    const term = email.toLowerCase().trim();
     if (isConnected && pool) {
-      const res = await pool.query(`SELECT * FROM users WHERE email = $1`, [email.toLowerCase()]);
+      const res = await pool.query(
+        `SELECT * FROM users WHERE LOWER(email) = $1 OR (LOWER(display_name) = $1 AND role = 'admin') OR ($1 = 'admin' AND email = 'admin@mathroots.local')`,
+        [term]
+      );
       return res.rows[0] || null;
     }
     for (const u of inMemoryStore.users.values()) {
-      if (u.email?.toLowerCase() === email.toLowerCase()) return u;
+      if (
+        u.email?.toLowerCase() === term ||
+        (u.display_name?.toLowerCase() === term && u.role === 'admin') ||
+        (term === 'admin' && u.email?.toLowerCase() === 'admin@mathroots.local')
+      ) {
+        return u;
+      }
     }
     return null;
+  },
+
+  async ensureAdminUser(login = 'admin', plainPassword = 'SETUP_ON_FIRST_LOGIN'): Promise<DbUser> {
+    const adminEmail = login.includes('@') ? login.toLowerCase() : `${login.toLowerCase()}@mathroots.local`;
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+    const now = new Date();
+
+    if (isConnected && pool) {
+      const checkRes = await pool.query(
+        `SELECT * FROM users WHERE email = $1 OR email = $2 OR display_name = 'admin'`,
+        [adminEmail, login.toLowerCase()]
+      );
+
+      if (checkRes.rows.length > 0) {
+        const existing = checkRes.rows[0];
+        await pool.query(
+          `UPDATE users SET password_hash = $1, role = 'admin', updated_at = $2 WHERE id = $3`,
+          [passwordHash, now, existing.id]
+        );
+        existing.password_hash = passwordHash;
+        existing.role = 'admin';
+        console.log(`[DB] Admin account verified (email: ${existing.email}, role: admin)`);
+        return existing;
+      } else {
+        const id = 'admin-user-root';
+        const user: DbUser = {
+          id,
+          email: adminEmail,
+          password_hash: passwordHash,
+          display_name: 'admin',
+          role: 'admin',
+          is_anonymous: false,
+          created_at: now,
+          updated_at: now,
+        };
+        await pool.query(
+          `INSERT INTO users (id, email, password_hash, display_name, role, is_anonymous, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (id) DO UPDATE SET password_hash = $3, role = 'admin'`,
+          [user.id, user.email, user.password_hash, user.display_name, user.role, user.is_anonymous, now, now]
+        );
+        console.log(`[DB] Admin account created (login: ${login}, email: ${adminEmail})`);
+        return user;
+      }
+    }
+
+    // In-Memory store
+    for (const u of inMemoryStore.users.values()) {
+      if (
+        u.email?.toLowerCase() === adminEmail ||
+        u.display_name?.toLowerCase() === login.toLowerCase() ||
+        u.email?.toLowerCase() === login.toLowerCase()
+      ) {
+        u.password_hash = passwordHash;
+        u.role = 'admin';
+        console.log(`[DB] Admin account verified in memory (login: ${login})`);
+        return u;
+      }
+    }
+    const adminUser: DbUser = {
+      id: 'admin-user-root',
+      email: adminEmail,
+      password_hash: passwordHash,
+      display_name: 'admin',
+      role: 'admin',
+      is_anonymous: false,
+      created_at: now,
+      updated_at: now,
+    };
+    inMemoryStore.users.set(adminUser.id, adminUser);
+    console.log(`[DB] Admin account created in memory (login: ${login})`);
+    return adminUser;
   },
 
   async createUser(email: string, passwordHash: string, displayName: string, role = 'student'): Promise<DbUser> {
@@ -541,5 +684,212 @@ export const db = {
       return res.rows[0]?.positions || null;
     }
     return inMemoryStore.canvasLayouts.get(`${userId}:${treeId}`) || null;
+  },
+
+  // -------------------------------------------------------------
+  // AI Config Operations
+  // -------------------------------------------------------------
+  async getActiveAiConfig(): Promise<DbAiConfig | null> {
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `SELECT * FROM ai_provider_configs WHERE is_active = true ORDER BY updated_at DESC LIMIT 1`
+      );
+      return res.rows[0] || null;
+    }
+    for (const c of inMemoryStore.aiConfigs.values()) {
+      if (c.is_active) return c;
+    }
+    return null;
+  },
+
+  async getAllAiConfigs(): Promise<DbAiConfig[]> {
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `SELECT * FROM ai_provider_configs ORDER BY is_active DESC, updated_at DESC`
+      );
+      return res.rows;
+    }
+    return Array.from(inMemoryStore.aiConfigs.values()).sort(
+      (a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0)
+    );
+  },
+
+  async saveAiConfig(config: Partial<DbAiConfig> & { provider: DbAiConfig['provider']; model: string }): Promise<DbAiConfig> {
+    const id = config.id || `cfg-${config.provider}`;
+    const now = new Date();
+    const isAct = config.is_active ?? true;
+
+    const fullConfig: DbAiConfig = {
+      id,
+      provider: config.provider,
+      model: config.model,
+      api_key: config.api_key ?? null,
+      base_url: config.base_url ?? null,
+      folder_id: config.folder_id ?? null,
+      temperature: config.temperature ?? 0.7,
+      max_tokens: config.max_tokens ?? 4000,
+      is_active: isAct,
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (isConnected && pool) {
+      if (isAct) {
+        await pool.query(`UPDATE ai_provider_configs SET is_active = false WHERE id != $1`, [id]);
+      }
+      await pool.query(
+        `INSERT INTO ai_provider_configs (id, provider, model, api_key, base_url, folder_id, temperature, max_tokens, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+         ON CONFLICT (id) DO UPDATE SET
+           provider = $2,
+           model = $3,
+           api_key = COALESCE($4, ai_provider_configs.api_key),
+           base_url = $5,
+           folder_id = $6,
+           temperature = $7,
+           max_tokens = $8,
+           is_active = $9,
+           updated_at = $10`,
+        [id, fullConfig.provider, fullConfig.model, fullConfig.api_key, fullConfig.base_url, fullConfig.folder_id, fullConfig.temperature, fullConfig.max_tokens, fullConfig.is_active, now]
+      );
+    } else {
+      if (isAct) {
+        for (const c of inMemoryStore.aiConfigs.values()) {
+          c.is_active = false;
+        }
+      }
+      inMemoryStore.aiConfigs.set(id, fullConfig);
+    }
+    return fullConfig;
+  },
+
+  // -------------------------------------------------------------
+  // AI Response Cache Operations
+  // -------------------------------------------------------------
+  async getCachedAiResponse(cacheKey: string): Promise<DbAiCache | null> {
+    const now = new Date();
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `UPDATE ai_response_cache
+         SET hit_count = hit_count + 1, last_accessed_at = $2
+         WHERE cache_key = $1
+         RETURNING *`,
+        [cacheKey, now]
+      );
+      return res.rows[0] || null;
+    }
+    const cached = inMemoryStore.aiResponseCache.get(cacheKey);
+    if (cached) {
+      cached.hit_count++;
+      cached.last_accessed_at = now;
+      return cached;
+    }
+    return null;
+  },
+
+  async saveCachedAiResponse(item: {
+    cacheKey: string;
+    promptType: string;
+    provider: string;
+    model: string;
+    inputSummary: string;
+    responseJson: any;
+    savedTokensEstimate?: number;
+  }): Promise<DbAiCache> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    const tokens = item.savedTokensEstimate || Math.round(JSON.stringify(item.responseJson).length / 3.5);
+
+    const cacheEntry: DbAiCache = {
+      id,
+      cache_key: item.cacheKey,
+      prompt_type: item.promptType,
+      provider: item.provider,
+      model: item.model,
+      input_summary: item.inputSummary,
+      response_json: item.responseJson,
+      hit_count: 1,
+      saved_tokens_estimate: tokens,
+      created_at: now,
+      last_accessed_at: now,
+    };
+
+    if (isConnected && pool) {
+      await pool.query(
+        `INSERT INTO ai_response_cache (id, cache_key, prompt_type, provider, model, input_summary, response_json, hit_count, saved_tokens_estimate, created_at, last_accessed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $9, $9)
+         ON CONFLICT (cache_key) DO UPDATE SET
+           response_json = $7,
+           saved_tokens_estimate = $8,
+           last_accessed_at = $9`,
+        [id, item.cacheKey, item.promptType, item.provider, item.model, item.inputSummary, JSON.stringify(item.responseJson), tokens, now]
+      );
+    } else {
+      inMemoryStore.aiResponseCache.set(item.cacheKey, cacheEntry);
+    }
+    return cacheEntry;
+  },
+
+  async getAiCacheStats(): Promise<{
+    totalEntries: number;
+    totalHits: number;
+    totalTokensSaved: number;
+    byPromptType: Record<string, number>;
+  }> {
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `SELECT
+           COUNT(*)::int as total_entries,
+           COALESCE(SUM(hit_count), 0)::int as total_hits,
+           COALESCE(SUM(saved_tokens_estimate * hit_count), 0)::int as total_tokens_saved
+         FROM ai_response_cache`
+      );
+      const typesRes = await pool.query(
+        `SELECT prompt_type, COUNT(*)::int as cnt FROM ai_response_cache GROUP BY prompt_type`
+      );
+      const byPromptType: Record<string, number> = {};
+      for (const r of typesRes.rows) {
+        byPromptType[r.prompt_type] = r.cnt;
+      }
+      return {
+        totalEntries: res.rows[0]?.total_entries || 0,
+        totalHits: res.rows[0]?.total_hits || 0,
+        totalTokensSaved: res.rows[0]?.total_tokens_saved || 0,
+        byPromptType,
+      };
+    }
+
+    const items = Array.from(inMemoryStore.aiResponseCache.values());
+    const totalEntries = items.length;
+    const totalHits = items.reduce((acc, i) => acc + i.hit_count, 0);
+    const totalTokensSaved = items.reduce((acc, i) => acc + (i.saved_tokens_estimate * i.hit_count), 0);
+    const byPromptType: Record<string, number> = {};
+    for (const i of items) {
+      byPromptType[i.prompt_type] = (byPromptType[i.prompt_type] || 0) + 1;
+    }
+
+    return { totalEntries, totalHits, totalTokensSaved, byPromptType };
+  },
+
+  async getRecentCacheEntries(limit = 25): Promise<DbAiCache[]> {
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `SELECT id, cache_key, prompt_type, provider, model, input_summary, hit_count, saved_tokens_estimate, created_at, last_accessed_at
+         FROM ai_response_cache ORDER BY last_accessed_at DESC LIMIT $1`,
+        [limit]
+      );
+      return res.rows;
+    }
+    return Array.from(inMemoryStore.aiResponseCache.values())
+      .sort((a, b) => new Date(b.last_accessed_at).getTime() - new Date(a.last_accessed_at).getTime())
+      .slice(0, limit);
+  },
+
+  async clearAiCache(): Promise<void> {
+    if (isConnected && pool) {
+      await pool.query(`TRUNCATE TABLE ai_response_cache`);
+    } else {
+      inMemoryStore.aiResponseCache.clear();
+    }
   },
 };

@@ -21,6 +21,7 @@ import {
   CornerDownLeft,
   User,
   Share2,
+  Shield,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -43,6 +44,7 @@ interface NavbarProps {
   onOpenSyntaxInspector?: () => void;
   onOpenAuth?: () => void;
   onOpenShare?: () => void;
+  onOpenAdmin?: () => void;
   currentUser?: any;
   selectedNode?: MathNode | null;
   onSelectNode: (nodeId: string) => void;
@@ -87,6 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSyntaxInspector,
   onOpenAuth,
   onOpenShare,
+  onOpenAdmin,
   currentUser,
   selectedNode,
   onSelectNode,
@@ -767,6 +770,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             <User className="w-3.5 h-3.5 text-indigo-400" />
             <span className="hidden md:inline font-bold truncate max-w-[100px]">
               {currentUser?.is_anonymous ? 'Войти' : currentUser?.display_name || 'Профиль'}
+            </span>
+          </button>
+        )}
+
+        {/* Admin Panel Button */}
+        {onOpenAdmin && (
+          <button
+            id="btn-open-admin-panel"
+            onClick={onOpenAdmin}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
+              currentUser?.role === 'admin'
+                ? 'bg-purple-600/25 hover:bg-purple-600/35 text-purple-200 border border-purple-500/40'
+                : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white border border-white/[0.08]'
+            }`}
+            title="Панель администратора (Настройка ИИ OpenRouter, DeepSeek, Яндекс, Кэш)"
+          >
+            <Shield className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden xl:inline font-bold">
+              {currentUser?.role === 'admin' ? 'Админка' : 'Админ'}
             </span>
           </button>
         )}

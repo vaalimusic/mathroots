@@ -73,3 +73,13 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     return res.status(401).json({ error: 'Токен недействителен или истек' });
   }
 }
+
+export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  await requireAuth(req, res, () => {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Доступ разрешен только администраторам (роль admin)' });
+    }
+    next();
+  });
+}
+

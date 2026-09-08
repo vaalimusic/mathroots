@@ -22,6 +22,7 @@ import { TreeWorkoutModal } from './components/TreeWorkoutModal';
 import { MathSyntaxInspectorModal } from './components/MathSyntaxInspectorModal';
 import { AuthModal } from './components/AuthModal';
 import { ShareTreeModal } from './components/ShareTreeModal';
+import { AdminPanelModal } from './components/AdminPanelModal';
 import {
   Sparkles,
   TreeDeciduous,
@@ -114,6 +115,7 @@ export default function App() {
   // Auth & Cloud Sharing Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [sharedToast, setSharedToast] = useState<string | null>(null);
 
@@ -448,6 +450,7 @@ export default function App() {
         onOpenSyntaxInspector={() => handleOpenSyntaxInspector('2x + 10', 3)}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenShare={() => setIsShareOpen(true)}
+        onOpenAdmin={() => setIsAdminOpen(true)}
         currentUser={currentUser}
         selectedNode={selectedNode}
         onSelectNode={handleNavigateToNode}
@@ -795,6 +798,16 @@ export default function App() {
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
         tree={activeTree}
+      />
+
+      {/* Admin Panel Modal (AI Providers & Smart Cache) */}
+      <AdminPanelModal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+        currentUser={currentUser}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+        }}
       />
 
       {/* Shared Tree Notification Toast */}

@@ -217,4 +217,35 @@ export const api = {
       return null;
     }
   },
+
+  // -------------------------------------------------------------
+  // Admin & AI Provider Settings
+  // -------------------------------------------------------------
+  async getAiConfigs(): Promise<{ active: any; all: any[] }> {
+    return await apiRequest('/api/admin/ai/configs');
+  },
+
+  async saveAiConfig(config: any) {
+    return await apiRequest('/api/admin/ai/configs', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  },
+
+  async testAiConfig(config: any) {
+    return await apiRequest('/api/admin/ai/test', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  },
+
+  async getAiCacheStats() {
+    return await apiRequest('/api/admin/cache/stats');
+  },
+
+  async clearAiCache() {
+    return await apiRequest('/api/admin/cache', {
+      method: 'DELETE',
+    });
+  },
 };
