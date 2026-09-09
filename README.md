@@ -61,7 +61,7 @@
 
 ```bash
 # 1. Клонируйте репозиторий
-git clone https://github.com/YOUR_USERNAME/matematika.git
+git clone https://github.com/vaalimusic/mathroots.git
 cd matematika
 
 # 2. Запустите стек сервисов (Frontend + Express API + PostgreSQL 16)
@@ -123,7 +123,7 @@ npm run dev
 # Внимание: не ставьте галочки "Add README", "Add .gitignore"
 
 # 2. Добавьте адрес вашего удалённого репозитория
-git remote add origin https://github.com/YOUR_USERNAME/matematika.git
+git remote add origin https://github.com/vaalimusic/mathroots.git
 
 # 3. Убедитесь, что основная ветка называется master (или main)
 git branch -M master
