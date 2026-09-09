@@ -116,7 +116,71 @@ async function generateJsonWithFallback(prompt: string, ai: GoogleGenAI): Promis
  */
 function createFallbackTree(problem: string) {
   const clean = problem.toLowerCase();
-  const isQuad = clean.includes("^2") || clean.includes("²") || clean.includes("квадрат");
+  const isCubic = clean.includes("^3") || clean.includes("³") || clean.includes("куб");
+  const isQuad = !isCubic && (clean.includes("^2") || clean.includes("²") || clean.includes("квадрат"));
+
+  if (isCubic) {
+    return {
+      title: `Кубическое уравнение: ${problem}`,
+      goalFormula: problem,
+      summary: `Анализ уравнения 3-й степени ${problem}: от свойств кубической степени и группировки до понижения степени (теорема Безу) и нахождения корней.`,
+      nodes: [
+        {
+          id: "root_powers",
+          title: "Свойства степеней и куб числа",
+          formula: "x^3 = x \\cdot x^2 = x \\cdot x \\cdot x",
+          layer: 0,
+          type: "concept",
+          branch: "main",
+          explanationHuman: "Куб числа сохраняет знак аргумента: (-x)^3 = -x^3. Любое кубическое уравнение с вещественными коэффициентами всегда имеет хотя бы один вещественный корень.",
+          formalRule: "Определение нечётной степени и непрерывность полиномиальной функции.",
+          visualSteps: ["x \\cdot x \\cdot x", "x^3"],
+          whyCanIDoThis: "Аксиомы алгебры и ассоциативность умножения.",
+          practiceExercise: { question: "Чему равно (-2)^3?", expectedAnswer: "-8", hint: "Минус, умноженный нечётное число раз, остаётся минусом." },
+          requires: [],
+        },
+        {
+          id: "root_grouping",
+          title: "Группировка слагаемых и канонический вид",
+          formula: "P(x) = 0",
+          layer: 1,
+          type: "concept",
+          branch: "main",
+          explanationHuman: "Переносим все члены в одну сторону, чтобы получить уравнение вида ax^3 + bx^2 + cx + d = 0, готовое к факторизации.",
+          formalRule: "Закон сохранения равенства при переносе слагаемых.",
+          visualSteps: ["Перенос всех членов в левую часть", "Приведение подобных слагаемых = 0"],
+          whyCanIDoThis: "Вычитание равных величин из обеих частей сохраняет равенство.",
+          requires: ["root_powers"],
+        },
+        {
+          id: "step_factor_reduction",
+          title: "Понижение степени (Теорема Безу / Схема Горнера)",
+          formula: "(x - x_1)(Ax^2 + Bx + C) = 0",
+          layer: 2,
+          type: "step",
+          branch: "main",
+          explanationHuman: "Подбираем первый корень среди делителей свободного члена и делим многочлен столбиком на (x - x_1), сводя оставшуюся часть к квадратному трехчлену.",
+          formalRule: "Теорема Безу о делимости многочлена на линейный двучлен.",
+          visualSteps: ["Поиск первого корня x_1", "Деление многочлена на (x - x_1)", "Квадратный множитель"],
+          whyCanIDoThis: "Факторизация многочлена на неприводимые множители.",
+          requires: ["root_grouping"],
+        },
+        {
+          id: "goal_node",
+          title: `Решение: ${problem}`,
+          formula: problem,
+          layer: 3,
+          type: "goal",
+          branch: "main",
+          explanationHuman: "Нахождение всех корней и финальная проверка подстановкой в исходное равенство.",
+          formalRule: "Проверка тождества вычислением левой и правой частей.",
+          visualSteps: ["Действительные корни уравнения", "Проверка истинности равенства"],
+          whyCanIDoThis: "Основная теорема алгебры: многочлен степени n имеет ровно n корней с учётом кратности.",
+          requires: ["step_factor_reduction"],
+        },
+      ],
+    };
+  }
 
   if (isQuad) {
     return {

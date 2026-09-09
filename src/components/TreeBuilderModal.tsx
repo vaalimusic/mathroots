@@ -59,24 +59,200 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
   const [genError, setGenError] = useState<string | null>(null);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
 
+  // Handle AI Auto-decompose
+  const handleAiDecompose = async (promptOverride?: string) => {
+    const targetPrompt = (typeof promptOverride === 'string' ? promptOverride : aiPrompt).trim();
+    if (!targetPrompt) return;
+    setIsGenerating(true);
+    setGenError(null);
+    setAiSuccessMessage(null);
+
+    try {
+      const response = await fetchAi('/api/ai/decompose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem: targetPrompt,
+          masteredTopics: Array.from(masteredIds),
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success && data.tree && Array.isArray(data.tree.nodes) && data.tree.nodes.length > 0) {
+        setTreeTitle(data.tree.title || targetPrompt);
+        setGoalFormula(data.tree.goalFormula || targetPrompt);
+        setDescription(data.tree.summary || `Сгенерированное дерево математических корней для: ${targetPrompt}`);
+
+        // Normalize and compute coordinates
+        const rawNodes: MathNode[] = data.tree.nodes.map((n: any, idx: number) => ({
+          id: n.id || `node_${idx}_${Date.now()}`,
+          title: n.title || `Узел ${idx + 1}`,
+          formula: n.formula || targetPrompt,
+          layer: typeof n.layer === 'number' ? n.layer : (idx === 0 ? 0 : idx === data.tree.nodes.length - 1 ? 3 : 1),
+          type: (n.type as NodeType) || (idx === data.tree.nodes.length - 1 ? 'goal' : idx === 0 ? 'axiom' : 'step'),
+          branch: (n.branch as BranchType) || 'main',
+          x: typeof n.x === 'number' ? n.x : 0,
+          y: typeof n.y === 'number' ? n.y : 0,
+          requires: Array.isArray(n.requires) ? n.requires : [],
+          explanationHuman: n.explanationHuman || 'Шаг математического решения.',
+          formalRule: n.formalRule || 'Свойство алгебраического преобразования.',
+          visualSteps: Array.isArray(n.visualSteps) ? n.visualSteps : [n.formula || targetPrompt],
+          whyCanIDoThis: n.whyCanIDoThis || 'Обоснование математического перехода.',
+          practiceExercise: n.practiceExercise,
+        }));
+
+        // Automatically position nodes neatly in multi-column layout
+        const positionedNodes = calculateTreeCoordinates(rawNodes, true);
+        setNodes(positionedNodes);
+        setAiSuccessMessage(`✨ Успешно декомпозировано на ${positionedNodes.length} взаимосвязанных узлов!`);
+        setIsGenerating(false);
+        return;
+      }
+    } catch (e: any) {
+      console.warn('AI generate failed, using local template decomposition:', e);
+      setGenError('Сервер AI был временно недоступен, использован локальный шаблонизатор.');
+    }
+
+    // Local smart fallback generator
+    const ts = Date.now();
+    const baseId = `node_base_${ts}`;
+    const step1Id = `node_step1_${ts}`;
+    const goalId = `node_goal_${ts}`;
+
+    const templateNodes: MathNode[] = [
+      {
+        id: baseId,
+        title: 'Основы равенств и арифметики',
+        formula: 'a = b \\implies a \\pm c = b \\pm c',
+        layer: 0,
+        type: 'axiom',
+        branch: 'main',
+        x: -180,
+        y: 500,
+        requires: [],
+        explanationHuman: 'Фундаментальное правило: любые обратимые операции над обеими частями сохраняют истинность.',
+        formalRule: 'Аксиома эквивалентности.',
+        visualSteps: ['Левая часть = Правая часть', 'Одинаковое преобразование с обеих сторон'],
+        whyCanIDoThis: 'Сохранение равенства.',
+      },
+      {
+        id: step1Id,
+        title: 'Шаг 1: Изоляция переменной',
+        formula: targetPrompt,
+        layer: 1,
+        type: 'step',
+        branch: 'main',
+        x: 0,
+        y: 300,
+        requires: [baseId],
+        explanationHuman: 'Сгруппируйте слагаемые с неизвестными в одну сторону, а свободные коэффициенты — в другую.',
+        formalRule: 'Перенос слагаемых с изменением знака.',
+        visualSteps: ['Перенос свободных членов', 'Приведение подобных слагаемых'],
+        whyCanIDoThis: 'Вычитание одного и того же значения из обеих частей уравнения.',
+      },
+      {
+        id: goalId,
+        title: `Цель: ${targetPrompt}`,
+        formula: targetPrompt,
+        layer: 2,
+        type: 'goal',
+        branch: 'main',
+        x: 0,
+        y: 80,
+        requires: [step1Id],
+        explanationHuman: 'Получение явного ответа для неизвестной переменной и финальная проверка подстановкой.',
+        formalRule: 'Проверка путем вычисления тождества.',
+        visualSteps: ['Подстановка корня', 'Проверка истинности'],
+        whyCanIDoThis: 'Единственность решения.',
+      },
+    ];
+
+    const positioned = calculateTreeCoordinates(templateNodes, true);
+    setTreeTitle(targetPrompt);
+    setGoalFormula(targetPrompt);
+    setDescription(`Математическое дерево корней для задачи: ${targetPrompt}`);
+    setNodes(positioned);
+    setAiSuccessMessage(`✨ Создан базовый каркас из ${positioned.length} узлов.`);
+    setIsGenerating(false);
+  };
+
   useEffect(() => {
     if (isOpen) {
-      if (initialPrompt) {
-        setAiPrompt(initialPrompt);
-        setTreeTitle(initialPrompt);
-        setGoalFormula(initialPrompt);
+      if (initialPrompt && initialPrompt.trim()) {
+        const prompt = initialPrompt.trim();
+        setAiPrompt(prompt);
+        setTreeTitle(prompt);
+        setGoalFormula(prompt);
+        setDescription(`Математическое дерево корней для задачи: ${prompt}`);
+        setGenError(null);
+        setAiSuccessMessage(null);
+        setEditingNodeId(null);
+
+        // Immediate responsive skeleton for custom prompt so user never sees previous tree nodes
+        const ts = Date.now();
+        const initialSkeleton: MathNode[] = [
+          {
+            id: `node_base_${ts}`,
+            title: 'Аксиомы равенства и базовые операции',
+            formula: 'a = b \\iff f(a) = f(b)',
+            layer: 0,
+            type: 'axiom',
+            branch: 'main',
+            x: -180,
+            y: 500,
+            requires: [],
+            explanationHuman: 'Фундаментальные правила эквивалентных преобразований.',
+            formalRule: 'Аксиома эквивалентности.',
+            visualSteps: ['Преобразование обеих частей'],
+            whyCanIDoThis: 'Сохранение тождества.',
+          },
+          {
+            id: `node_step1_${ts}`,
+            title: 'Шаг 1: Преобразование уравнения',
+            formula: prompt,
+            layer: 1,
+            type: 'step',
+            branch: 'main',
+            x: 0,
+            y: 300,
+            requires: [`node_base_${ts}`],
+            explanationHuman: 'Группировка слагаемых и подготовка к нахождению корней.',
+            formalRule: 'Алгебраические законы.',
+            visualSteps: ['Перенос членов', 'Приведение подобных'],
+            whyCanIDoThis: 'Свойства операций.',
+          },
+          {
+            id: `node_goal_${ts}`,
+            title: `Цель: ${prompt}`,
+            formula: prompt,
+            layer: 2,
+            type: 'goal',
+            branch: 'main',
+            x: 0,
+            y: 80,
+            requires: [`node_step1_${ts}`],
+            explanationHuman: 'Финальное решение и проверка корней уравнения.',
+            formalRule: 'Проверка тождества.',
+            visualSteps: ['Нахождение неизвестного', 'Проверка истинности'],
+            whyCanIDoThis: 'Единственность корней.',
+          },
+        ];
+        setNodes(calculateTreeCoordinates(initialSkeleton, true));
+
+        // Automatically launch AI decomposition for the target equation
+        handleAiDecompose(prompt);
       } else {
         setTreeTitle(activeTree.title);
         setGoalFormula(activeTree.goalFormula);
         setCategory(activeTree.category);
         setDescription(activeTree.description);
         setNodes(activeTree.nodes);
+        setGenError(null);
+        setAiSuccessMessage(null);
+        setEditingNodeId(null);
       }
-      setGenError(null);
-      setAiSuccessMessage(null);
-      setEditingNodeId(null);
     }
-  }, [isOpen, initialPrompt, activeTree]);
+  }, [isOpen, initialPrompt]);
 
   // New node form state
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -247,122 +423,6 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
     setGenError(null);
   };
 
-  // Handle AI Auto-decompose
-  const handleAiDecompose = async (promptOverride?: string) => {
-    const targetPrompt = (typeof promptOverride === 'string' ? promptOverride : aiPrompt).trim();
-    if (!targetPrompt) return;
-    setIsGenerating(true);
-    setGenError(null);
-    setAiSuccessMessage(null);
-
-    try {
-      const response = await fetchAi('/api/ai/decompose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem: targetPrompt,
-          masteredTopics: Array.from(masteredIds),
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success && data.tree && Array.isArray(data.tree.nodes) && data.tree.nodes.length > 0) {
-        setTreeTitle(data.tree.title || targetPrompt);
-        setGoalFormula(data.tree.goalFormula || targetPrompt);
-        setDescription(data.tree.summary || `Сгенерированное дерево математических корней для: ${targetPrompt}`);
-
-        // Normalize and compute coordinates
-        const rawNodes: MathNode[] = data.tree.nodes.map((n: any, idx: number) => ({
-          id: n.id || `node_${idx}_${Date.now()}`,
-          title: n.title || `Узел ${idx + 1}`,
-          formula: n.formula || targetPrompt,
-          layer: typeof n.layer === 'number' ? n.layer : (idx === 0 ? 0 : idx === data.tree.nodes.length - 1 ? 3 : 1),
-          type: (n.type as NodeType) || (idx === data.tree.nodes.length - 1 ? 'goal' : idx === 0 ? 'axiom' : 'step'),
-          branch: (n.branch as BranchType) || 'main',
-          x: typeof n.x === 'number' ? n.x : 0,
-          y: typeof n.y === 'number' ? n.y : 0,
-          requires: Array.isArray(n.requires) ? n.requires : [],
-          explanationHuman: n.explanationHuman || 'Шаг математического решения.',
-          formalRule: n.formalRule || 'Свойство алгебраического преобразования.',
-          visualSteps: Array.isArray(n.visualSteps) ? n.visualSteps : [n.formula || targetPrompt],
-          whyCanIDoThis: n.whyCanIDoThis || 'Обоснование математического перехода.',
-          practiceExercise: n.practiceExercise,
-        }));
-
-        // Automatically position nodes neatly in multi-column layout
-        const positionedNodes = calculateTreeCoordinates(rawNodes, true);
-        setNodes(positionedNodes);
-        setAiSuccessMessage(`✨ Успешно декомпозировано на ${positionedNodes.length} взаимосвязанных узлов!`);
-        setIsGenerating(false);
-        return;
-      }
-    } catch (e: any) {
-      console.warn('AI generate failed, using local template decomposition:', e);
-      setGenError('Сервер AI был временно недоступен, использован локальный шаблонизатор.');
-    }
-
-    // Local smart fallback generator
-    const ts = Date.now();
-    const baseId = `node_base_${ts}`;
-    const step1Id = `node_step1_${ts}`;
-    const goalId = `node_goal_${ts}`;
-
-    const templateNodes: MathNode[] = [
-      {
-        id: baseId,
-        title: 'Основы равенств и арифметики',
-        formula: 'a = b \\implies a \\pm c = b \\pm c',
-        layer: 0,
-        type: 'axiom',
-        branch: 'main',
-        x: -180,
-        y: 500,
-        requires: [],
-        explanationHuman: 'Фундаментальное правило: любые обратимые операции над обеими частями сохраняют истинность.',
-        formalRule: 'Аксиома эквивалентности.',
-        visualSteps: ['Левая часть = Правая часть', 'Одинаковое преобразование с обеих сторон'],
-        whyCanIDoThis: 'Сохранение равенства.',
-      },
-      {
-        id: step1Id,
-        title: 'Шаг 1: Изоляция переменной',
-        formula: targetPrompt,
-        layer: 1,
-        type: 'step',
-        branch: 'main',
-        x: 0,
-        y: 300,
-        requires: [baseId],
-        explanationHuman: 'Сгруппируйте слагаемые с неизвестными в одну сторону, а свободные коэффициенты — в другую.',
-        formalRule: 'Перенос слагаемых с изменением знака.',
-        visualSteps: ['Перенос свободных членов', 'Приведение подобных слагаемых'],
-        whyCanIDoThis: 'Вычитание одного и того же значения из обеих частей уравнения.',
-      },
-      {
-        id: goalId,
-        title: `Цель: ${targetPrompt}`,
-        formula: targetPrompt,
-        layer: 2,
-        type: 'goal',
-        branch: 'main',
-        x: 0,
-        y: 80,
-        requires: [step1Id],
-        explanationHuman: 'Получение явного ответа для неизвестной переменной и финальная проверка подстановкой.',
-        formalRule: 'Проверка путем вычисления тождества.',
-        visualSteps: ['Подстановка корня', 'Проверка истинности'],
-        whyCanIDoThis: 'Единственность решения.',
-      },
-    ];
-
-    const positioned = calculateTreeCoordinates(templateNodes, true);
-    setTreeTitle(targetPrompt);
-    setGoalFormula(targetPrompt);
-    setDescription(`Математическое дерево корней для задачи: ${targetPrompt}`);
-    setNodes(positioned);
-    setAiSuccessMessage(`✨ Создан базовый каркас из ${positioned.length} узлов.`);
-    setIsGenerating(false);
-  };
 
   // Add or update node
   const handleSaveNode = () => {

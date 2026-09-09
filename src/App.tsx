@@ -246,7 +246,9 @@ export default function App() {
 
   // Quick problem solve / input
   const handleQuickSolve = (problemText: string) => {
-    const clean = problemText.toLowerCase();
+    const trimmed = problemText.trim();
+    if (!trimmed) return;
+    const clean = trimmed.toLowerCase();
     setShowFirstUsageHero(false);
     try {
       localStorage.setItem(STORAGE_KEY_FIRST_SEEN, 'true');
@@ -254,54 +256,68 @@ export default function App() {
       // ignore
     }
 
-    if (clean.includes('1/2') || clean.includes('1/3') || clean.includes('дроб')) {
-      setActiveTreeId('fractions');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('пифагор') || clean.includes('a^2') || clean.includes('a²') || clean.includes('c²')) {
-      setActiveTreeId('pythagoras');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('sin') || clean.includes('cos') || clean.includes('тригонометр')) {
-      setActiveTreeId('trigonometry');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('производн') || clean.includes('касательн') || clean.includes("f'")) {
-      setActiveTreeId('derivative_tangent');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('2^x') || clean.includes('логарифм') || clean.includes('степен')) {
-      setActiveTreeId('exp_log_mvp');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('x^2') || clean.includes('x²') || clean.includes('5x') || clean.includes('квадрат')) {
-      setActiveTreeId('quadratic');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('2x + 5') || clean.includes('2x+5') || clean.includes('15')) {
-      setActiveTreeId('linear');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('вращения') || clean.includes('интеграл') || clean.includes('sqrt')) {
-      setActiveTreeId('surface_integral');
-      setCurrentView('canvas');
-      return;
-    }
-    if (clean.includes('2x + 4') || clean.includes('2x+4') || clean.includes('10')) {
-      setActiveTreeId('linear_mvp');
+    // 1. Direct exact match with existing catalog trees (formula or title)
+    const exactTree = trees.find((t) => {
+      const titleLower = t.title.toLowerCase();
+      const goalLower = (t.goalFormula || '').toLowerCase();
+      return titleLower === clean || goalLower === clean;
+    });
+
+    if (exactTree) {
+      setActiveTreeId(exactTree.id);
       setCurrentView('canvas');
       return;
     }
 
-    // Otherwise open builder with custom prompt
-    setBuilderInitialPrompt(problemText);
+    // 2. High-level topic names (ONLY if user typed a topic query, NOT an arbitrary mathematical equation)
+    const isEquation = clean.includes('=') || /^[0-9a-z\s\^\+\-\*\/\(\)]+=[0-9a-z\s\^\+\-\*\/\(\)]+$/i.test(clean);
+
+    if (!isEquation) {
+      if (clean === 'дроби' || clean === 'арифметика дробей' || clean === 'сложение дробей') {
+        setActiveTreeId('fractions');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'пифагор' || clean === 'теорема пифагора') {
+        setActiveTreeId('pythagoras');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'тригонометрия' || clean === 'синус' || clean === 'косинус' || clean === 'тангенс') {
+        setActiveTreeId('trigonometry');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'производная' || clean === 'касательная' || clean === 'дифференциал') {
+        setActiveTreeId('derivative_tangent');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'логарифм' || clean === 'логарифмы' || clean === 'показательные уравнения') {
+        setActiveTreeId('exp_log_mvp');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'интеграл' || clean === 'тело вращения' || clean === 'интегралы') {
+        setActiveTreeId('surface_integral');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'квадратное уравнение' || clean === 'дискриминант' || clean === 'теорема виета') {
+        setActiveTreeId('quadratic');
+        setCurrentView('canvas');
+        return;
+      }
+      if (clean === 'линейное уравнение' || clean === 'весы') {
+        setActiveTreeId('linear_mvp');
+        setCurrentView('canvas');
+        return;
+      }
+    }
+
+    // 3. For any arbitrary math problem, equation, or goal formula:
+    // Open AI Builder & Decomposer directly with this exact prompt!
+    setBuilderInitialPrompt(trimmed);
     setIsBuilderOpen(true);
   };
 

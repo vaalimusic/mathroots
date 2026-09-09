@@ -5,7 +5,6 @@ import {
   Layers,
   Sparkles,
   Shield,
-  Server,
   Zap,
   HelpCircle,
   CheckCircle2,
@@ -13,18 +12,11 @@ import {
   Scale,
   Compass,
   FileText,
-  Copy,
-  Check,
   ArrowRight,
-  Database,
-  Terminal,
   Activity,
-  Cpu,
-  Key,
   PieChart,
   TrendingUp,
   Search,
-  Bot,
 } from 'lucide-react';
 import { VisualLabTab } from './VisualLabModal';
 
@@ -41,7 +33,7 @@ interface PlatformGuideModalProps {
   onOpenAiSettings?: () => void;
 }
 
-type GuideTab = 'overview' | 'labs' | 'tools' | 'admin' | 'production' | 'faq';
+type GuideTab = 'overview' | 'labs' | 'tools' | 'faq';
 
 export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
   isOpen,
@@ -55,23 +47,14 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
   onOpenGaps,
 }) => {
   const [activeTab, setActiveTab] = useState<GuideTab>('overview');
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   if (!isOpen) return null;
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
 
   const tabs: Array<{ id: GuideTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
     { id: 'overview', label: '1. Архитектура & Слои 0–4', icon: BookOpen },
     { id: 'labs', label: '2. 9 Визуальных лабораторий', icon: Layers },
     { id: 'tools', label: '3. Тренажер, AST & Пробелы', icon: Zap },
-    { id: 'admin', label: '4. Настройки AI & Свой ключ', icon: Bot },
-    { id: 'production', label: '5. Production & Docker', icon: Server },
-    { id: 'faq', label: '6. Сценарии & Hotkeys', icon: HelpCircle },
+    { id: 'faq', label: '4. Сценарии & Hotkeys', icon: HelpCircle },
   ];
 
   return (
@@ -96,7 +79,7 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Полная техническая и методическая документация: архитектура графа, 9 лабораторий, AI и деплой
+                Полная методическая документация: архитектура графа, 9 интерактивных лабораторий, тренажёр и горячие клавиши
               </p>
             </div>
           </div>
@@ -653,254 +636,7 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: AI SETTINGS & BYOK */}
-          {activeTab === 'admin' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 text-indigo-300 font-bold text-sm">
-                    <Bot className="w-5 h-5 text-indigo-400" />
-                    <span>Интеллектуальный движок MathRoots (AI)</span>
-                  </div>
-                  {onOpenAiSettings && (
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onOpenAiSettings();
-                      }}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-950/50 flex items-center gap-1.5 shrink-0"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Открыть Настройки AI</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1.5">
-                    <div className="font-bold text-emerald-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4" />
-                      <span>1. Серверный AI по умолчанию (Бесплатно)</span>
-                    </div>
-                    <div className="text-slate-300 text-[11px] leading-relaxed">
-                      Работает сразу для всех пользователей math.everty.ru. Не требует ввода ключей, регистрации у провайдеров и пополнения баланса. Декомпозиция и объяснения генерируются автоматически через центральный шлюз платформы.
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-1.5">
-                    <div className="font-bold text-purple-300 flex items-center gap-1.5">
-                      <Key className="w-4 h-4" />
-                      <span>2. Собственный API-ключ (BYOK)</span>
-                    </div>
-                    <div className="text-slate-300 text-[11px] leading-relaxed">
-                      Если вы хотите использовать свою квоту, рассуждающие модели (DeepSeek R1, Claude 3.5 Sonnet) или работать через корпоративный прокси — введите свой ключ в меню «Настройки AI». Ключ хранится только в вашем браузере.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-400">
-                  MathRoots полностью уважает вашу приватность: персональные API-ключи пользователей хранятся исключительно в LocalStorage вашего браузера и никогда не сохраняются в базу данных сервера.
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-base font-bold text-white flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-purple-400" />
-                  Поддерживаемые AI-провайдеры
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-white text-xs">OpenRouter</div>
-                      <span className="text-[10px] text-indigo-300 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-500/20">Единый API</span>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Доступ ко всем мировым моделям: Claude 3.5 Sonnet, GPT-4o, Llama 3.1 405B, Gemini 1.5 Pro по единому ключу.
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-white text-xs">DeepSeek (V3 / R1)</div>
-                      <span className="text-[10px] text-sky-300 bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-500/20">Лучший для математики</span>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Высокая точность математических рассуждений при минимальной стоимости токенов. Родной эндпоинт <code className="text-sky-300">api.deepseek.com</code>.
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-white text-xs">Яндекс AI (YandexGPT 4)</div>
-                      <span className="text-[10px] text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/20">РФ Хостинг</span>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Поддержка Yandex Cloud API (API Key + Folder ID). Полная независимость от зарубежных шлюзов, высокая скорость по РФ.
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-white text-xs">Google Gemini & OpenAI</div>
-                      <span className="text-[10px] text-emerald-300 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/20">Универсальные</span>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Поддержка прямого Gemini API (`gemini-2.5/3.1-flash`) и любых OpenAI-совместимых шлюзов с кастомным base URL.
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-950/30 via-purple-950/20 to-slate-900/40 border border-indigo-500/30 space-y-1.5 md:col-span-2">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
-                        <span>Проксирование & Кастомные Base URL (Обход блокировок)</span>
-                        <span className="text-[10px] text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30">Пресеты в 1 клик</span>
-                      </div>
-                      <span className="text-[10px] text-emerald-400 font-mono">ProxyAPI • VseGPT • Groq • Ollama</span>
-                    </div>
-                    <div className="text-xs text-slate-300">
-                      Если прямой доступ к официальному OpenAI заблокирован из-за региональных ограничений (403 Forbidden / Cloudflare), в админ-панели можно в 1 клик переключить <strong>Base URL</strong> на любой совместимый шлюз: <strong>ProxyAPI</strong> (карты РФ / СБП), <strong>VseGPT</strong>, <strong>Groq</strong> (сверхбыстрый LPU) или локальный <strong>Ollama / LM Studio</strong> без интернета.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Smart Token Caching */}
-              <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 space-y-2.5">
-                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
-                  <Database className="w-4 h-4" />
-                  <span>Умное кэширование ответов (Smart Token Saving Cache)</span>
-                </div>
-                <h5 className="font-bold text-white text-sm">
-                  Экономия до 95% токенов и ускорение ответов с 3000 мс до 10 мс
-                </h5>
-                <p className="text-xs text-slate-300">
-                  Все математические промпты декомпозиции и генерации деревьев нормализуются (удаление лишних пробелов, 
-                  регистронезависимость) и хешируются через SHA-256 в таблице базы данных <code className="text-emerald-300 font-mono">ai_response_cache</code>. 
-                  Повторный запрос идентичной задачи отдается мгновенно из кэша с нулевым расходом токенов.
-                </p>
-                <div className="text-[11px] text-slate-400">
-                  В админке доступна кнопка ручной очистки кэша и живой тест задержки (Ping Latency).
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: PRODUCTION DEPLOYMENT */}
-          {activeTab === 'production' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-white">Развертывание в Production</h3>
-                  <p className="text-xs text-slate-400">
-                    Готовый стек: Node.js/Express + React/Vite + PostgreSQL 16 Alpine в Docker
-                  </p>
-                </div>
-                <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
-                  Docker Compose v2
-                </span>
-              </div>
-
-              {/* Architecture Schema */}
-              <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.08] space-y-3">
-                <div className="text-xs font-bold text-slate-300">Сетевая топология контейнеров:</div>
-                <div className="p-3 rounded-xl bg-slate-950 font-mono text-xs text-slate-300 space-y-1.5 border border-white/[0.05]">
-                  <div className="text-indigo-400">Internet / Пользователи</div>
-                  <div className="text-slate-500">  │ (Port 80 / 443 HTTPS через Nginx)</div>
-                  <div className="text-emerald-400">  ▼</div>
-                  <div className="text-emerald-400">mathroots-app (Port 3000)</div>
-                  <div className="text-slate-400">  ├─ React SPA Client (Статика Vite)</div>
-                  <div className="text-slate-400">  ├─ Express API (/api/health, /api/auth, /api/ai/...)</div>
-                  <div className="text-slate-400">  └─ AI Dispatcher + SHA-256 Token Cache</div>
-                  <div className="text-sky-400">  │ (Docker Internal Network: postgres:5432)</div>
-                  <div className="text-sky-400">  ▼</div>
-                  <div className="text-sky-400">mathroots-postgres (Host port 5433 -&gt; Container port 5432)</div>
-                  <div className="text-slate-400">  └─ Docker Volume: postgres_data (Постоянные данные)</div>
-                </div>
-              </div>
-
-              {/* Command Cheat-sheet */}
-              <div className="space-y-3">
-                <div className="text-sm font-bold text-white flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-emerald-400" />
-                  Команды для терминала сервера
-                </div>
-
-                <div className="space-y-2">
-                  <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.08] flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] text-slate-400 mb-1">Сборка и запуск контейнеров в фоне:</div>
-                      <code className="text-emerald-300 font-mono text-xs">docker compose up -d --build</code>
-                    </div>
-                    <button
-                      onClick={() => copyToClipboard('docker compose up -d --build', 'cmd1')}
-                      className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300"
-                    >
-                      {copiedKey === 'cmd1' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.08] flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] text-slate-400 mb-1">Проверка статуса и здоровья (Healthcheck):</div>
-                      <code className="text-emerald-300 font-mono text-xs">docker compose ps</code>
-                    </div>
-                    <button
-                      onClick={() => copyToClipboard('docker compose ps', 'cmd2')}
-                      className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300"
-                    >
-                      {copiedKey === 'cmd2' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.08] flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] text-slate-400 mb-1">Просмотр логов в реальном времени:</div>
-                      <code className="text-emerald-300 font-mono text-xs">docker compose logs -f app</code>
-                    </div>
-                    <button
-                      onClick={() => copyToClipboard('docker compose logs -f app', 'cmd3')}
-                      className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300"
-                    >
-                      {copiedKey === 'cmd3' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.08] flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] text-slate-400 mb-1">Создание резервной копии БД (Backup):</div>
-                      <code className="text-emerald-300 font-mono text-xs">
-                        docker compose exec postgres pg_dump -U postgres mathroots &gt; backup.sql
-                      </code>
-                    </div>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(
-                          'docker compose exec postgres pg_dump -U postgres mathroots > backup.sql',
-                          'cmd4'
-                        )
-                      }
-                      className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300"
-                    >
-                      {copiedKey === 'cmd4' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* SSL & Nginx note */}
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-2">
-                <div className="font-bold text-white text-xs">Рекомендация для публичного домена:</div>
-                <p className="text-xs text-slate-400">
-                  Установите на хост Nginx с <code className="text-indigo-300">certbot --nginx</code> и проксируйте 
-                  запросы на <code className="text-indigo-300">http://127.0.0.1:3000</code> с заголовками 
-                  <code className="text-indigo-300 font-mono"> proxy_set_header X-Forwarded-For $remote_addr;</code>. 
-                  Все cookie авторизации уже настроены для защищенного production-окружения.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 6: SCENARIOS & HOTKEYS */}
+          {/* TAB 4: SCENARIOS & HOTKEYS */}
           {activeTab === 'faq' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               <div className="space-y-3">
