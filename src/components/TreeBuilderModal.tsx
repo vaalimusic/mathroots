@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MathNode, MathTree, NodeType, BranchType } from '../types';
+import { INITIAL_TREES } from '../data/trees';
 import { MathFormula } from './MathFormula';
 import { calculateTreeCoordinates } from '../utils/mathEngine';
 import {
@@ -228,6 +229,18 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  // Load full preset tree from catalog
+  const handleLoadPresetTree = (preset: MathTree) => {
+    setTreeTitle(preset.title);
+    setGoalFormula(preset.goalFormula);
+    setCategory(preset.category);
+    setDescription(preset.description);
+    setNodes(preset.nodes);
+    setAiPrompt(preset.goalFormula || preset.title);
+    setAiSuccessMessage(`✨ Загружено эталонное дерево: «${preset.title}» (${preset.nodes.length} корней)!`);
+    setGenError(null);
+  };
 
   // Handle AI Auto-decompose
   const handleAiDecompose = async (promptOverride?: string) => {
@@ -581,6 +594,32 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
                 {genError}
               </span>
             )}
+          </div>
+
+          {/* Presets Catalog Bar */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/[0.06] text-xs">
+            <span className="text-indigo-300 font-medium flex items-center gap-1">
+              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+              Готовые эталонные деревья:
+            </span>
+            {INITIAL_TREES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => handleLoadPresetTree(t)}
+                className={`px-2.5 py-1 rounded-lg border transition-all text-left flex items-center gap-1.5 ${
+                  treeTitle === t.title
+                    ? 'bg-indigo-600/30 text-indigo-200 border-indigo-500/60 shadow-sm shadow-indigo-950/50'
+                    : 'bg-white/[0.03] text-slate-300 hover:text-white border-white/[0.07] hover:border-indigo-500/30 hover:bg-white/[0.07]'
+                }`}
+                title={`${t.description || t.title} (${t.nodes.length} узлов)`}
+              >
+                <span className="font-semibold">{t.title}</span>
+                <span className="text-[10px] px-1 py-0.2 rounded bg-white/10 text-slate-400 font-mono">
+                  {t.nodes.length} узл.
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 

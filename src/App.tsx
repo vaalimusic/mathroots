@@ -828,6 +828,47 @@ export default function App() {
         onOpenGaps={() => setIsMyGapsOpen(true)}
       />
 
+      {/* Tree Cheat Sheet & Printable Study Guide Modal */}
+      <TreeCheatSheetModal
+        isOpen={isCheatSheetOpen}
+        onClose={() => setIsCheatSheetOpen(false)}
+        tree={activeTree}
+        masteredIds={masteredIds}
+        onNavigateToNode={(nodeId) => {
+          setIsCheatSheetOpen(false);
+          handleNavigateToNode(nodeId);
+        }}
+      />
+
+      {/* Interactive Tree Workout & Problem Trainer Modal */}
+      <TreeWorkoutModal
+        isOpen={isWorkoutOpen}
+        onClose={() => setIsWorkoutOpen(false)}
+        tree={activeTree}
+        masteredIds={masteredIds}
+        onMarkMastered={handleToggleMastered}
+        onNavigateToNode={(nodeId) => {
+          setIsWorkoutOpen(false);
+          handleNavigateToNode(nodeId);
+        }}
+        onOpenDontUnderstand={(node) => {
+          setSelectedNode(node);
+          setIsWorkoutOpen(false);
+        }}
+        onOpenSyntaxInspector={(expression, xVal) => {
+          setIsWorkoutOpen(false);
+          handleOpenSyntaxInspector(expression, xVal);
+        }}
+        onSelectTree={(treeId) => {
+          setIsWorkoutOpen(false);
+          handleSelectTree(treeId);
+        }}
+        onOpenStepSolver={(problem) => {
+          setIsWorkoutOpen(false);
+          setCurrentView('steps');
+        }}
+      />
+
       {/* Shared Tree Notification Toast */}
       {sharedToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-indigo-600 text-white font-bold text-xs shadow-2xl shadow-indigo-950 border border-indigo-400/40 animate-in fade-in slide-in-from-bottom-3">
