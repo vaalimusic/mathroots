@@ -7,3 +7,10 @@ coverage/
 .env*
 !.env.example
 pgdata/
+
+# Article drafts & Internal overviews
+PROJECT_OVERVIEW.md
+FEATURES_ARTICLE_DRAFT.md
+*OVERVIEW*.md
+*ARTICLE*.md
+
