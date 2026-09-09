@@ -336,26 +336,47 @@ export const db = {
     return null;
   },
 
-  async ensureAdminUser(login = 'admin', plainPassword = 'SETUP_ON_FIRST_LOGIN'): Promise<DbUser> {
+  async isSetupRequired(): Promise<boolean> {
+    if (isConnected && pool) {
+      try {
+        const res = await pool.query(
+          `SELECT id FROM users WHERE role = 'admin' AND password_hash IS NOT NULL AND password_hash != '' LIMIT 1`
+        );
+        return res.rows.length === 0;
+      } catch (err) {
+        console.warn('[DB] Error checking setup requirement:', err);
+      }
+    }
+    for (const u of inMemoryStore.users.values()) {
+      if (u.role === 'admin' && u.password_hash) {
+        return false;
+      }
+    }
+    return true;
+  },
+
+  async setupAdmin(login = 'admin', plainPassword: string): Promise<DbUser> {
     const adminEmail = login.includes('@') ? login.toLowerCase() : `${login.toLowerCase()}@mathroots.local`;
     const passwordHash = await bcrypt.hash(plainPassword, 10);
     const now = new Date();
 
     if (isConnected && pool) {
       const checkRes = await pool.query(
-        `SELECT * FROM users WHERE email = $1 OR email = $2 OR display_name = 'admin'`,
-        [adminEmail, login.toLowerCase()]
+        `SELECT * FROM users WHERE role = 'admin' OR email = $1 OR display_name = $2 LIMIT 1`,
+        [adminEmail, login]
       );
 
       if (checkRes.rows.length > 0) {
         const existing = checkRes.rows[0];
         await pool.query(
-          `UPDATE users SET password_hash = $1, role = 'admin', updated_at = $2 WHERE id = $3`,
-          [passwordHash, now, existing.id]
+          `UPDATE users SET email = $1, display_name = $2, password_hash = $3, role = 'admin', is_anonymous = false, updated_at = $4 WHERE id = $5`,
+          [adminEmail, login, passwordHash, now, existing.id]
         );
+        existing.email = adminEmail;
+        existing.display_name = login;
         existing.password_hash = passwordHash;
         existing.role = 'admin';
-        console.log(`[DB] Admin account verified (email: ${existing.email}, role: admin)`);
+        console.log(`[DB] Master Admin account configured (login: ${login})`);
         return existing;
       } else {
         const id = 'admin-user-root';
@@ -363,7 +384,7 @@ export const db = {
           id,
           email: adminEmail,
           password_hash: passwordHash,
-          display_name: 'admin',
+          display_name: login,
           role: 'admin',
           is_anonymous: false,
           created_at: now,
@@ -372,40 +393,62 @@ export const db = {
         await pool.query(
           `INSERT INTO users (id, email, password_hash, display_name, role, is_anonymous, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (id) DO UPDATE SET password_hash = $3, role = 'admin'`,
+           ON CONFLICT (id) DO UPDATE SET email = $2, display_name = $4, password_hash = $3, role = 'admin'`,
           [user.id, user.email, user.password_hash, user.display_name, user.role, user.is_anonymous, now, now]
         );
-        console.log(`[DB] Admin account created (login: ${login}, email: ${adminEmail})`);
+        console.log(`[DB] Master Admin account created (login: ${login})`);
         return user;
       }
     }
 
     // In-Memory store
     for (const u of inMemoryStore.users.values()) {
-      if (
-        u.email?.toLowerCase() === adminEmail ||
-        u.display_name?.toLowerCase() === login.toLowerCase() ||
-        u.email?.toLowerCase() === login.toLowerCase()
-      ) {
+      if (u.role === 'admin' || u.email?.toLowerCase() === adminEmail) {
+        u.email = adminEmail;
+        u.display_name = login;
         u.password_hash = passwordHash;
         u.role = 'admin';
-        console.log(`[DB] Admin account verified in memory (login: ${login})`);
+        console.log(`[DB] Master Admin account configured in memory (login: ${login})`);
         return u;
       }
     }
+
     const adminUser: DbUser = {
       id: 'admin-user-root',
       email: adminEmail,
       password_hash: passwordHash,
-      display_name: 'admin',
+      display_name: login,
       role: 'admin',
       is_anonymous: false,
       created_at: now,
       updated_at: now,
     };
     inMemoryStore.users.set(adminUser.id, adminUser);
-    console.log(`[DB] Admin account created in memory (login: ${login})`);
+    console.log(`[DB] Master Admin account created in memory (login: ${login})`);
     return adminUser;
+  },
+
+  async ensureAdminUser(login = 'admin', plainPassword?: string): Promise<DbUser | null> {
+    if (plainPassword) {
+      return await this.setupAdmin(login, plainPassword);
+    }
+
+    // Verify if an existing admin exists
+    const adminEmail = login.includes('@') ? login.toLowerCase() : `${login.toLowerCase()}@mathroots.local`;
+    if (isConnected && pool) {
+      const checkRes = await pool.query(
+        `SELECT * FROM users WHERE role = 'admin' OR email = $1 LIMIT 1`,
+        [adminEmail]
+      );
+      if (checkRes.rows.length > 0) {
+        return checkRes.rows[0];
+      }
+    } else {
+      for (const u of inMemoryStore.users.values()) {
+        if (u.role === 'admin') return u;
+      }
+    }
+    return null;
   },
 
   async createUser(email: string, passwordHash: string, displayName: string, role = 'student'): Promise<DbUser> {

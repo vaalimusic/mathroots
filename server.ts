@@ -316,6 +316,49 @@ app.get("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
   res.json({ success: true, user: req.user });
 });
 
+// Check if first-time admin setup is required
+app.get("/api/admin/setup-status", async (_req, res) => {
+  try {
+    const needsSetup = await db.isSetupRequired();
+    res.json({ success: true, needsSetup });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// First-time admin master setup
+app.post("/api/admin/setup", authLimiter, async (req, res) => {
+  try {
+    const needsSetup = await db.isSetupRequired();
+    if (!needsSetup) {
+      return res.status(400).json({ error: "Администратор уже настроен. Войдите с установленным паролем." });
+    }
+
+    const { login = "admin", password } = req.body;
+    if (!password || typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({ error: "Пароль должен содержать не менее 6 символов" });
+    }
+
+    const cleanLogin = (login || "admin").trim().toLowerCase();
+    const adminUser = await db.setupAdmin(cleanLogin, password);
+    const token = generateToken(adminUser);
+
+    res.json({
+      success: true,
+      message: "Учетная запись администратора успешно создана!",
+      token,
+      user: {
+        id: adminUser.id,
+        email: adminUser.email,
+        display_name: adminUser.display_name,
+        role: adminUser.role,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка создания администратора", details: err.message });
+  }
+});
+
 // -------------------------------------------------------------
 // User Progress, Mastery & Workouts Endpoints
 // -------------------------------------------------------------
@@ -1067,10 +1110,19 @@ async function startServer() {
   // Initialize Database
   await initDb();
 
-  // Ensure Admin user exists with login 'admin' and password 'SETUP_ON_FIRST_LOGIN'
-  await db.ensureAdminUser("admin", "SETUP_ON_FIRST_LOGIN").catch((err) => {
-    console.warn("[DB] Could not seed admin user:", err);
-  });
+  // Check if Master Admin setup is required
+  const needsAdminSetup = await db.isSetupRequired();
+  if (needsAdminSetup) {
+    if (process.env.ADMIN_PASSWORD) {
+      const login = process.env.ADMIN_LOGIN || "admin";
+      await db.setupAdmin(login, process.env.ADMIN_PASSWORD);
+      console.log(`[Security] Admin auto-provisioned from environment variables (login: ${login})`);
+    } else {
+      console.log("[Security] First-time setup required: master admin will be configured on first visit to /vaalimusic");
+    }
+  } else {
+    console.log("[Security] Master Admin account is active and verified.");
+  }
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

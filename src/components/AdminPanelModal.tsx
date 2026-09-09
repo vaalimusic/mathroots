@@ -207,8 +207,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   // Admin login gate state
   const [loginUser, setLoginUser] = useState('admin');
   const [loginPass, setLoginPass] = useState('');
+  const [setupConfirmPass, setSetupConfirmPass] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSettingUp, setIsSettingUp] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (isOpen && currentUser?.role !== 'admin') {
+      fetch('/api/admin/setup-status')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && typeof data.needsSetup === 'boolean') {
+            setNeedsSetup(data.needsSetup);
+          }
+        })
+        .catch(() => setNeedsSetup(false));
+    }
+  }, [isOpen, currentUser]);
 
   // Chat Test State
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -499,6 +515,43 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
+  const handleAdminSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginPass !== setupConfirmPass) {
+      setLoginError('Пароли не совпадают. Проверьте правильность повторного ввода.');
+      return;
+    }
+    if (loginPass.length < 6) {
+      setLoginError('Пароль должен содержать минимум 6 символов');
+      return;
+    }
+    setIsSettingUp(true);
+    setLoginError(null);
+    try {
+      const response = await fetch('/api/admin/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          login: loginUser.trim() || 'admin',
+          password: loginPass,
+        }),
+      });
+      const res = await response.json();
+      if (res?.token && res?.user) {
+        localStorage.setItem('mathroots_token', res.token);
+        if (onLoginSuccess) onLoginSuccess(res.user);
+        setNeedsSetup(false);
+        loadData();
+      } else {
+        setLoginError(res?.error || 'Не удалось завершить настройку администратора');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Ошибка связи с сервером при настройке');
+    } finally {
+      setIsSettingUp(false);
+    }
+  };
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
@@ -520,10 +573,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   if (!isOpen) return null;
 
-  // If user is not admin, show direct admin login form
+  // If user is not admin, show setup or login form
   if (currentUser?.role !== 'admin') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
         <div className="bg-[#0b0e18] border border-white/[0.12] rounded-3xl w-full max-w-md shadow-2xl p-6 sm:p-7 relative overflow-hidden">
           <button
             onClick={onClose}
@@ -532,57 +585,135 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-              <Shield className="w-5 h-5" />
-            </div>
+          {needsSetup ? (
+            /* First-Time Master Setup Form */
             <div>
-              <h2 className="text-base font-black text-white">Вход в панель администратора</h2>
-              <p className="text-xs text-slate-400">Управление провайдерами ИИ и кэшем</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Логин / Email:</label>
-              <input
-                type="text"
-                value={loginUser}
-                onChange={(e) => setLoginUser(e.target.value)}
-                placeholder="admin"
-                required
-                className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Пароль администратора:</label>
-              <input
-                type="password"
-                value={loginPass}
-                onChange={(e) => setLoginPass(e.target.value)}
-                placeholder="SETUP_ON_FIRST_LOGIN"
-                required
-                className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            {loginError && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{loginError}</span>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 shrink-0">
+                  <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white">Первоначальная настройка</h2>
+                  <p className="text-xs text-slate-400">Создайте пароль администратора платформы</p>
+                </div>
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={isLoggingIn}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Shield className="w-4 h-4" />
-              <span>{isLoggingIn ? 'Проверка прав...' : 'Войти в панель управления'}</span>
-            </button>
-          </form>
+              <div className="mb-4 p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-slate-300 text-xs leading-relaxed">
+                Вы вошли в систему впервые. Задайте логин и надёжный мастер-пароль для доступа к управлению AI-моделями и кэшем.
+              </div>
+
+              <form onSubmit={handleAdminSetup} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">Логин администратора:</label>
+                  <input
+                    type="text"
+                    value={loginUser}
+                    onChange={(e) => setLoginUser(e.target.value)}
+                    placeholder="admin"
+                    required
+                    className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">Новый мастер-пароль (минимум 6 символов):</label>
+                  <input
+                    type="password"
+                    value={loginPass}
+                    onChange={(e) => setLoginPass(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                    className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">Повторите мастер-пароль:</label>
+                  <input
+                    type="password"
+                    value={setupConfirmPass}
+                    onChange={(e) => setSetupConfirmPass(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                    className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {loginError && (
+                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSettingUp}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>{isSettingUp ? 'Создание учетной записи...' : 'Создать администратора и войти'}</span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            /* Standard Admin Login Form */
+            <div>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white">Вход в панель администратора</h2>
+                  <p className="text-xs text-slate-400">Управление провайдерами ИИ и платформой</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">Логин / Email:</label>
+                  <input
+                    type="text"
+                    value={loginUser}
+                    onChange={(e) => setLoginUser(e.target.value)}
+                    placeholder="admin"
+                    required
+                    className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">Пароль администратора:</label>
+                  <input
+                    type="password"
+                    value={loginPass}
+                    onChange={(e) => setLoginPass(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="w-full px-3.5 py-2.5 bg-[#070911] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {loginError && (
+                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>{isLoggingIn ? 'Проверка прав...' : 'Войти в панель управления'}</span>
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1407,8 +1538,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     <div className="font-bold text-emerald-400 font-mono text-sm mt-0.5">admin</div>
                   </div>
                   <div className="p-3 rounded-xl bg-[#0c1020] border border-white/[0.06]">
-                    <span className="text-slate-400">Пароль по умолчанию:</span>
-                    <div className="font-bold text-slate-300 font-mono text-sm mt-0.5">SETUP_ON_FIRST_LOGIN</div>
+                    <span className="text-slate-400">Статус пароля:</span>
+                    <div className="font-bold text-emerald-400 font-mono text-sm mt-0.5">Установлен администратором</div>
                   </div>
                 </div>
               </div>
