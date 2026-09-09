@@ -692,6 +692,25 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
                 <div className="text-[11px] text-slate-400">
                   Администратор гарантированно инициализируется в базе данных PostgreSQL при первом запуске сервера.
                 </div>
+
+                <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="text-slate-200 font-bold flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Скрытый вход в админ-панель (по прямой ссылке):</span>
+                    </div>
+                    <div className="text-purple-300 font-mono font-bold mt-1">
+                      https://math.everty.ru/vaalimusic
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard('https://math.everty.ru/vaalimusic', 'secret_url')}
+                    className="px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    {copiedKey === 'secret_url' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedKey === 'secret_url' ? 'Скопировано!' : 'Копировать URL'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -950,6 +969,10 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
                   <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.08] flex justify-between items-center">
                     <span className="text-slate-400">Закрыть окно / Выйти в граф</span>
                     <span className="px-2 py-1 rounded bg-white/10 text-white font-bold">Esc</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 flex justify-between items-center sm:col-span-2">
+                    <span className="text-indigo-200 font-bold">Открыть руководство и инструкцию</span>
+                    <span className="px-2 py-1 rounded bg-indigo-600/40 text-indigo-100 font-bold border border-indigo-400/40">F1</span>
                   </div>
                 </div>
               </div>

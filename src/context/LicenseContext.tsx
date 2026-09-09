@@ -24,53 +24,24 @@ export interface LicenseState {
 const LicenseContext = createContext<LicenseState | null>(null);
 
 export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isPro, setIsPro] = useState<boolean>(false);
-  const [plan, setPlan] = useState<LicensePlan>('free');
-  const [licenseKey, setLicenseKey] = useState<string | null>(getStoredLicenseKey());
+  // Free public access mode for math.everty.ru: all PRO features are 100% unlocked by default
+  const [isPro, setIsPro] = useState<boolean>(true);
+  const [plan, setPlan] = useState<LicensePlan>('pro_lifetime');
+  const [licenseKey, setLicenseKey] = useState<string | null>(getStoredLicenseKey() || 'PUBLIC_FREE_ACCESS');
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('unlicensed');
-  const [maxActivations, setMaxActivations] = useState<number | undefined>();
-  const [activationsCount, setActivationsCount] = useState<number | undefined>();
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [status, setStatus] = useState<string>('active');
+  const [maxActivations, setMaxActivations] = useState<number | undefined>(999999);
+  const [activationsCount, setActivationsCount] = useState<number | undefined>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [targetFeature, setTargetFeature] = useState<string | null>(null);
 
   const refreshLicense = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const storedKey = getStoredLicenseKey();
-      if (!storedKey) {
-        setIsPro(false);
-        setPlan('free');
-        setStatus('unlicensed');
-        setExpiresAt(null);
-        setIsLoading(false);
-        return;
-      }
-
-      const res = await api.getLicenseStatus();
-      if (res && res.isPro) {
-        setIsPro(true);
-        setPlan((res.plan as LicensePlan) || 'pro_year');
-        setLicenseKey(res.keyCode || storedKey);
-        setExpiresAt(res.expiresAt || null);
-        setStatus(res.status || 'active');
-        setMaxActivations(res.maxActivations);
-        setActivationsCount(res.activationsCount);
-      } else {
-        setIsPro(false);
-        setPlan('free');
-        setStatus(res?.status || 'invalid');
-      }
-    } catch {
-      // Offline fallback: if previously had a stored key, retain soft pro mode
-      const storedKey = getStoredLicenseKey();
-      if (storedKey && storedKey.startsWith('MR-')) {
-        setIsPro(true);
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    // Keep isPro true for unrestricted public usage on math.everty.ru
+    setIsPro(true);
+    setPlan('pro_lifetime');
+    setStatus('active');
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {

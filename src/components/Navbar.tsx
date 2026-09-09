@@ -48,6 +48,7 @@ interface NavbarProps {
   onOpenAuth?: () => void;
   onOpenShare?: () => void;
   onOpenAdmin?: () => void;
+  onOpenGuide?: () => void;
   currentUser?: any;
   selectedNode?: MathNode | null;
   onSelectNode: (nodeId: string) => void;
@@ -93,6 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenShare,
   onOpenAdmin,
+  onOpenGuide,
   currentUser,
   selectedNode,
   onSelectNode,
@@ -763,54 +765,30 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden sm:inline">Конструктор</span>
         </button>
 
-        {/* PRO License Upgrade / Status Button */}
-        <button
-          id="btn-open-license-upgrade"
-          type="button"
-          onClick={() => openUpgradeModal()}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-            isPro
-              ? 'bg-gradient-to-r from-amber-500/20 to-indigo-600/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
-              : 'bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-md shadow-indigo-950/40 border border-amber-300/30 animate-pulse'
-          }`}
-          title={isPro ? 'Подписка PRO активна (нажмите для просмотра)' : 'Активировать полный доступ PRO'}
-        >
-          <Crown className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-          <span className="font-extrabold tracking-tight">
-            {isPro ? '👑 PRO' : '✨ PRO'}
-          </span>
-        </button>
+        {/* Guide / Instructions & Help Button */}
+        {onOpenGuide && (
+          <button
+            id="btn-open-platform-guide"
+            onClick={onOpenGuide}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-200 border border-indigo-500/40 shadow-sm transition-all"
+            title="Подробная инструкция и руководство по платформе (F1)"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline font-bold">Инструкция & Помощь</span>
+          </button>
+        )}
 
         {/* Profile / Auth Button */}
         {onOpenAuth && (
           <button
             id="btn-open-auth-profile"
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.1] transition-colors"
             title="Профиль и синхронизация"
           >
-            <User className="w-3.5 h-3.5 text-indigo-400" />
+            <User className="w-3.5 h-3.5 text-slate-400" />
             <span className="hidden md:inline font-bold truncate max-w-[100px]">
               {currentUser?.is_anonymous ? 'Войти' : currentUser?.display_name || 'Профиль'}
-            </span>
-          </button>
-        )}
-
-        {/* Admin Panel Button */}
-        {onOpenAdmin && (
-          <button
-            id="btn-open-admin-panel"
-            onClick={onOpenAdmin}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-              currentUser?.role === 'admin'
-                ? 'bg-purple-600/25 hover:bg-purple-600/35 text-purple-200 border border-purple-500/40'
-                : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white border border-white/[0.08]'
-            }`}
-            title="Панель администратора (Настройка ИИ OpenRouter, DeepSeek, Яндекс, Кэш)"
-          >
-            <Shield className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden xl:inline font-bold">
-              {currentUser?.role === 'admin' ? 'Админка' : 'Админ'}
             </span>
           </button>
         )}

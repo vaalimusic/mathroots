@@ -68,10 +68,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     },
     {
       id: 'guide',
-      label: 'Инструкция & Руководство',
+      label: 'Инструкция и помощь',
       icon: BookOpen,
-      badge: 'Гид',
-      badgeColor: 'bg-gradient-to-r from-emerald-500/20 to-indigo-500/20 text-emerald-300 border border-emerald-500/30 font-bold',
+      badge: 'F1 Справка',
+      badgeColor: 'bg-gradient-to-r from-amber-500/25 to-indigo-500/25 text-amber-300 border border-amber-500/40 font-bold shadow-sm',
     },
     {
       id: 'solve_problem',

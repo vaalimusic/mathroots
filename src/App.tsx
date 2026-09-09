@@ -25,6 +25,7 @@ import { ShareTreeModal } from './components/ShareTreeModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { PlatformGuideModal } from './components/PlatformGuideModal';
 import { LicenseModal } from './components/LicenseModal';
+import { FreeWelcomeModal } from './components/FreeWelcomeModal';
 import { useLicense } from './context/LicenseContext';
 import {
   Sparkles,
@@ -392,6 +393,11 @@ export default function App() {
   // Global Keyboard Shortcuts (Section 44)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // F1 -> Open Platform Guide & Help
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setIsGuideOpen(true);
+      }
       // Ctrl+K -> Focus Search
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -431,6 +437,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Secret URL access for Admin Panel (/vaalimusic)
+  useEffect(() => {
+    try {
+      const path = window.location.pathname.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (
+        path === '/vaalimusic' ||
+        path.startsWith('/vaalimusic') ||
+        search.includes('vaalimusic') ||
+        hash.includes('vaalimusic')
+      ) {
+        setIsAdminOpen(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   return (
     <div className="flex flex-col w-screen h-screen overflow-hidden bg-[#050507] font-sans text-[#e2e8f0] select-none">
       {/* Top Navigation Bar (Section 2 & 4) */}
@@ -458,6 +483,7 @@ export default function App() {
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenShare={() => setIsShareOpen(true)}
         onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenGuide={() => setIsGuideOpen(true)}
         currentUser={currentUser}
         selectedNode={selectedNode}
         onSelectNode={handleNavigateToNode}
@@ -873,6 +899,9 @@ export default function App() {
 
       {/* License & Monetization Modal */}
       <LicenseModal />
+
+      {/* Free Welcome & Inspiring Greeting Modal */}
+      <FreeWelcomeModal onOpenGuide={() => setIsGuideOpen(true)} />
 
       {/* Shared Tree Notification Toast */}
       {sharedToast && (
