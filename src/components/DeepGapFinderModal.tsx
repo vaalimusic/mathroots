@@ -19,6 +19,7 @@ import {
   Lightbulb,
   CornerDownRight
 } from 'lucide-react';
+import { fetchAi } from '../context/UserAiContext';
 
 interface DeepGapFinderModalProps {
   isOpen: boolean;
@@ -165,7 +166,7 @@ export const DeepGapFinderModal: React.FC<DeepGapFinderModalProps> = ({
     setIsAiDiagnosing(true);
     setAiDiagnosticResult(null);
     try {
-      const response = await fetch('/api/ai/diagnose-stuck', {
+      const response = await fetchAi('/api/ai/diagnose-stuck', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

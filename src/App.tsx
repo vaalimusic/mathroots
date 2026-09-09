@@ -26,6 +26,7 @@ import { AdminPanelModal } from './components/AdminPanelModal';
 import { PlatformGuideModal } from './components/PlatformGuideModal';
 import { LicenseModal } from './components/LicenseModal';
 import { FreeWelcomeModal } from './components/FreeWelcomeModal';
+import { UserAiSettingsModal } from './components/UserAiSettingsModal';
 import { useLicense } from './context/LicenseContext';
 import {
   Sparkles,
@@ -37,7 +38,9 @@ import {
   X,
   Sliders,
   RotateCcw,
-  Check
+  Check,
+  Bot,
+  ArrowRight,
 } from 'lucide-react';
 import { api } from './utils/apiClient';
 
@@ -115,6 +118,7 @@ export default function App() {
   const [isWorkoutOpen, setIsWorkoutOpen] = useState(false);
   const [isCheatSheetOpen, setIsCheatSheetOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   // Auth & Cloud Sharing Modals
@@ -484,6 +488,7 @@ export default function App() {
         onOpenShare={() => setIsShareOpen(true)}
         onOpenAdmin={() => setIsAdminOpen(true)}
         onOpenGuide={() => setIsGuideOpen(true)}
+        onOpenAiSettings={() => setIsAiSettingsOpen(true)}
         currentUser={currentUser}
         selectedNode={selectedNode}
         onSelectNode={handleNavigateToNode}
@@ -502,6 +507,7 @@ export default function App() {
           gapCount={weakIds.size}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenProfile={() => setIsMyKnowledgeMapOpen(true)}
+          onOpenAiSettings={() => setIsAiSettingsOpen(true)}
         />
 
         {/* Central Space: Infinite Canvas OR Interactive Solver */}
@@ -801,6 +807,23 @@ export default function App() {
               </div>
 
               <div>
+                <div className="font-bold text-slate-200 mb-1">Интеллект платформы (AI):</div>
+                <button
+                  onClick={() => {
+                    setIsSettingsOpen(false);
+                    setIsAiSettingsOpen(true);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 border border-purple-500/40 font-semibold transition-colors flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-purple-400" />
+                    <span>Настройки AI (BYOK / Серверный)</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-purple-400" />
+                </button>
+              </div>
+
+              <div>
                 <div className="font-bold text-slate-200 mb-1">Сброс прогресса:</div>
                 <button
                   onClick={() => {
@@ -833,6 +856,12 @@ export default function App() {
         tree={activeTree}
       />
 
+      {/* User AI Settings Modal (BYOK / Server Default) */}
+      <UserAiSettingsModal
+        isOpen={isAiSettingsOpen}
+        onClose={() => setIsAiSettingsOpen(false)}
+      />
+
       {/* Admin Panel Modal (AI Providers & Smart Cache) */}
       <AdminPanelModal
         isOpen={isAdminOpen}
@@ -854,6 +883,7 @@ export default function App() {
         onOpenBuilder={() => setIsBuilderOpen(true)}
         onOpenCheatSheet={() => setIsCheatSheetOpen(true)}
         onOpenGaps={() => setIsMyGapsOpen(true)}
+        onOpenAiSettings={() => setIsAiSettingsOpen(true)}
       />
 
       {/* Tree Cheat Sheet & Printable Study Guide Modal */}

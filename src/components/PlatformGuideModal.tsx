@@ -23,7 +23,8 @@ import {
   Key,
   PieChart,
   TrendingUp,
-  Search
+  Search,
+  Bot,
 } from 'lucide-react';
 import { VisualLabTab } from './VisualLabModal';
 
@@ -37,6 +38,7 @@ interface PlatformGuideModalProps {
   onOpenBuilder?: () => void;
   onOpenCheatSheet?: () => void;
   onOpenGaps?: () => void;
+  onOpenAiSettings?: () => void;
 }
 
 type GuideTab = 'overview' | 'labs' | 'tools' | 'admin' | 'production' | 'faq';
@@ -67,7 +69,7 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
     { id: 'overview', label: '1. Архитектура & Слои 0–4', icon: BookOpen },
     { id: 'labs', label: '2. 9 Визуальных лабораторий', icon: Layers },
     { id: 'tools', label: '3. Тренажер, AST & Пробелы', icon: Zap },
-    { id: 'admin', label: '4. Админ-панель & AI', icon: Shield },
+    { id: 'admin', label: '4. Настройки AI & Свой ключ', icon: Bot },
     { id: 'production', label: '5. Production & Docker', icon: Server },
     { id: 'faq', label: '6. Сценарии & Hotkeys', icon: HelpCircle },
   ];
@@ -651,65 +653,53 @@ export const PlatformGuideModal: React.FC<PlatformGuideModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: ADMIN PANEL & AI PROVIDERS */}
+          {/* TAB 4: AI SETTINGS & BYOK */}
           {activeTab === 'admin' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
-                    <Shield className="w-4 h-4 text-indigo-400" />
-                    <span>Учетные данные администратора по умолчанию</span>
+              <div className="p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 text-indigo-300 font-bold text-sm">
+                    <Bot className="w-5 h-5 text-indigo-400" />
+                    <span>Интеллектуальный движок MathRoots (AI)</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onOpenAdmin?.();
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
-                  >
-                    Войти в админ-панель
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-black/40 p-3 rounded-xl border border-white/[0.08] font-mono text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Логин:</span>
-                    <span className="text-emerald-300 font-bold select-all">admin</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Пароль:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-300 font-bold select-all">SETUP_ON_FIRST_LOGIN</span>
-                      <button
-                        onClick={() => copyToClipboard('SETUP_ON_FIRST_LOGIN', 'pwd')}
-                        className="text-slate-400 hover:text-white"
-                        title="Скопировать пароль"
-                      >
-                        {copiedKey === 'pwd' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Администратор гарантированно инициализируется в базе данных PostgreSQL при первом запуске сервера.
+                  {onOpenAiSettings && (
+                    <button
+                      onClick={() => {
+                        onClose();
+                        onOpenAiSettings();
+                      }}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-950/50 flex items-center gap-1.5 shrink-0"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Открыть Настройки AI</span>
+                    </button>
+                  )}
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                  <div>
-                    <div className="text-slate-200 font-bold flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Скрытый вход в админ-панель (по прямой ссылке):</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1.5">
+                    <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4" />
+                      <span>1. Серверный AI по умолчанию (Бесплатно)</span>
                     </div>
-                    <div className="text-purple-300 font-mono font-bold mt-1">
-                      https://math.everty.ru/vaalimusic
+                    <div className="text-slate-300 text-[11px] leading-relaxed">
+                      Работает сразу для всех пользователей math.everty.ru. Не требует ввода ключей, регистрации у провайдеров и пополнения баланса. Декомпозиция и объяснения генерируются автоматически через центральный шлюз платформы.
                     </div>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard('https://math.everty.ru/vaalimusic', 'secret_url')}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0"
-                  >
-                    {copiedKey === 'secret_url' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedKey === 'secret_url' ? 'Скопировано!' : 'Копировать URL'}</span>
-                  </button>
+
+                  <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-1.5">
+                    <div className="font-bold text-purple-300 flex items-center gap-1.5">
+                      <Key className="w-4 h-4" />
+                      <span>2. Собственный API-ключ (BYOK)</span>
+                    </div>
+                    <div className="text-slate-300 text-[11px] leading-relaxed">
+                      Если вы хотите использовать свою квоту, рассуждающие модели (DeepSeek R1, Claude 3.5 Sonnet) или работать через корпоративный прокси — введите свой ключ в меню «Настройки AI». Ключ хранится только в вашем браузере.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-400">
+                  MathRoots полностью уважает вашу приватность: персональные API-ключи пользователей хранятся исключительно в LocalStorage вашего браузера и никогда не сохраняются в базу данных сервера.
                 </div>
               </div>
 

@@ -25,8 +25,10 @@ import {
   Crown,
   Lock,
   BookOpen,
+  Bot,
 } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
+import { useUserAi } from '../context/UserAiContext';
 
 interface NavbarProps {
   trees: MathTree[];
@@ -50,6 +52,7 @@ interface NavbarProps {
   onOpenShare?: () => void;
   onOpenAdmin?: () => void;
   onOpenGuide?: () => void;
+  onOpenAiSettings?: () => void;
   currentUser?: any;
   selectedNode?: MathNode | null;
   onSelectNode: (nodeId: string) => void;
@@ -96,12 +99,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenShare,
   onOpenAdmin,
   onOpenGuide,
+  onOpenAiSettings,
   currentUser,
   selectedNode,
   onSelectNode,
   onQuickSolve,
 }) => {
   const { isPro, openUpgradeModal } = useLicense();
+  const { isCustomActive, activeBadge } = useUserAi();
   const [quickInput, setQuickInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
@@ -776,6 +781,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
             <span className="hidden sm:inline font-bold">Инструкция & Помощь</span>
+          </button>
+        )}
+
+        {/* User AI Settings Button */}
+        {onOpenAiSettings && (
+          <button
+            id="btn-open-user-ai-settings"
+            onClick={onOpenAiSettings}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all border ${
+              isCustomActive
+                ? 'bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border-purple-500/40 shadow-sm shadow-purple-950/40'
+                : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border-white/[0.1]'
+            }`}
+            title={`Настройки AI (${activeBadge})`}
+          >
+            <Bot className={`w-3.5 h-3.5 ${isCustomActive ? 'text-purple-400' : 'text-slate-400'}`} />
+            <span className="hidden sm:inline font-bold">
+              {isCustomActive ? activeBadge : 'Настройки AI'}
+            </span>
+            {isCustomActive && (
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse hidden sm:inline-block" />
+            )}
           </button>
         )}
 

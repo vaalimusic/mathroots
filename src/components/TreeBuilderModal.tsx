@@ -27,6 +27,7 @@ import {
   Crown
 } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
+import { fetchAi } from '../context/UserAiContext';
 
 interface TreeBuilderModalProps {
   isOpen: boolean;
@@ -255,7 +256,7 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
     setAiSuccessMessage(null);
 
     try {
-      const response = await fetch('/api/ai/decompose', {
+      const response = await fetchAi('/api/ai/decompose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -15,8 +15,10 @@ import {
   Binary,
   Layers,
   Zap,
-  FileText
+  FileText,
+  Bot
 } from 'lucide-react';
+import { useUserAi } from '../context/UserAiContext';
 
 export type LeftNavSection =
   | 'my_map'
@@ -40,6 +42,7 @@ interface LeftSidebarProps {
   gapCount: number;
   onOpenSettings: () => void;
   onOpenProfile: () => void;
+  onOpenAiSettings?: () => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -51,7 +54,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   gapCount,
   onOpenSettings,
   onOpenProfile,
+  onOpenAiSettings,
 }) => {
+  const { isCustomActive, activeBadge } = useUserAi();
   const navItems: Array<{
     id: LeftNavSection;
     label: string;
@@ -210,6 +215,34 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
       {/* Bottom Section: Настройки & Профиль */}
       <div className="p-3 border-t border-white/[0.08] space-y-1">
+        {onOpenAiSettings && (
+          <button
+            id="btn-ai-settings-sidebar"
+            onClick={onOpenAiSettings}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-white/[0.05] transition-colors group relative"
+            title={isCollapsed ? `Настройки AI (${activeBadge})` : undefined}
+          >
+            <div className="flex items-center gap-3 truncate">
+              <Bot className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${isCustomActive ? 'text-purple-400' : 'text-slate-400'}`} />
+              {!isCollapsed && <span>Настройки AI</span>}
+            </div>
+            {!isCollapsed && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                isCustomActive
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : 'bg-white/10 text-slate-400'
+              }`}>
+                {isCustomActive ? activeBadge : 'По умолч.'}
+              </span>
+            )}
+            {isCollapsed && (
+              <div className="absolute left-full ml-2 px-2.5 py-1 bg-slate-900 text-white text-xs rounded-md shadow-xl border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                Настройки AI ({activeBadge})
+              </div>
+            )}
+          </button>
+        )}
+
         <button
           id="btn-settings-sidebar"
           onClick={onOpenSettings}

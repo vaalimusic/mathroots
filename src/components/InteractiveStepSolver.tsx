@@ -22,6 +22,7 @@ import {
   Layers,
   Target
 } from 'lucide-react';
+import { fetchAi } from '../context/UserAiContext';
 
 interface InteractiveStepSolverProps {
   tree?: MathTree;
@@ -104,7 +105,7 @@ export const InteractiveStepSolver: React.FC<InteractiveStepSolverProps> = ({
     setIsAiLoadingStep(true);
     setAiStepHint(null);
     try {
-      const response = await fetch('/api/ai/explain-why', {
+      const response = await fetchAi('/api/ai/explain-why', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

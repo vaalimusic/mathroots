@@ -34,9 +34,36 @@ export async function executeAiWithCache<T = any>(
   promptType: string,
   inputPayload: any,
   inputSummary: string,
-  generator: (activeConfig: DbAiConfig | null) => Promise<T>
+  generator: (activeConfig: DbAiConfig | null) => Promise<T>,
+  customConfigOverride?: Partial<DbAiConfig> | null
 ): Promise<{ data: T; cached: boolean; provider: string; model: string; hitCount?: number }> {
-  const cacheKey = computeCacheKey(promptType, inputPayload);
+  // Determine if using custom config from user
+  const isCustom = Boolean(customConfigOverride && customConfigOverride.provider && customConfigOverride.api_key);
+  let activeConfig: DbAiConfig | null = null;
+
+  if (isCustom) {
+    activeConfig = {
+      id: 'custom_user',
+      provider: customConfigOverride!.provider as any,
+      model: customConfigOverride!.model || 'default',
+      api_key: customConfigOverride!.api_key || '',
+      base_url: customConfigOverride!.base_url || null,
+      folder_id: customConfigOverride!.folder_id || null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  } else {
+    try {
+      activeConfig = await db.getActiveAiConfig();
+    } catch (err) {
+      console.warn('[AI Config] Could not fetch active config, using env defaults:', err);
+    }
+  }
+
+  const provider = activeConfig?.provider || 'gemini';
+  const model = activeConfig?.model || 'gemini-3.1-flash-lite';
+  const cacheKey = computeCacheKey(isCustom ? `${promptType}::${provider}::${model}` : promptType, inputPayload);
 
   // 1. Try reading from cache
   try {
@@ -57,18 +84,7 @@ export async function executeAiWithCache<T = any>(
     console.warn('[AI Cache] Read error, bypassing cache:', cacheErr);
   }
 
-  // 2. Fetch active provider configuration
-  let activeConfig: DbAiConfig | null = null;
-  try {
-    activeConfig = await db.getActiveAiConfig();
-  } catch (err) {
-    console.warn('[AI Config] Could not fetch active config, using env defaults:', err);
-  }
-
-  const provider = activeConfig?.provider || 'gemini';
-  const model = activeConfig?.model || 'gemini-3.1-flash-lite';
-
-  console.log(`[AI Dispatcher] MISS (${promptType}) invoking provider=${provider} model=${model}...`);
+  console.log(`[AI Dispatcher] MISS (${promptType}) invoking provider=${provider} model=${model} (custom=${isCustom})...`);
 
   // 3. Invoke actual AI generator
   const data = await generator(activeConfig);

@@ -39,6 +39,7 @@ import {
   ArrowRight,
   ArrowUp
 } from 'lucide-react';
+import { fetchAi } from '../context/UserAiContext';
 
 interface NodeDetailDrawerProps {
   node: MathNode | null;
@@ -115,7 +116,7 @@ export const NodeDetailDrawer: React.FC<NodeDetailDrawerProps> = ({
     setIsAiExplaining(true);
     setAiExplainError(null);
     try {
-      const res = await fetch('/api/ai/explain-why', {
+      const res = await fetchAi('/api/ai/explain-why', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

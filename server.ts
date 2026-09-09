@@ -476,6 +476,34 @@ app.put("/api/canvas/layout/:treeId", optionalAuth, async (req: AuthRequest, res
 // AI Endpoints (Decomposition, Deep Why, Cognitive Diagnosis)
 // -------------------------------------------------------------
 
+function extractCustomAiConfig(req: express.Request): Partial<DbAiConfig> | null {
+  const bodyCfg = req.body?.customAiConfig;
+  if (bodyCfg && (bodyCfg.apiKey || bodyCfg.api_key) && bodyCfg.provider) {
+    return {
+      provider: bodyCfg.provider,
+      model: bodyCfg.model || undefined,
+      api_key: bodyCfg.apiKey || bodyCfg.api_key,
+      base_url: bodyCfg.baseUrl || bodyCfg.base_url || null,
+      folder_id: bodyCfg.folderId || bodyCfg.folder_id || null,
+    };
+  }
+  const hProvider = req.headers["x-custom-ai-provider"] as string;
+  const hKey = req.headers["x-custom-ai-key"] as string;
+  const hModel = req.headers["x-custom-ai-model"] as string;
+  const hBaseUrl = req.headers["x-custom-ai-base-url"] as string;
+  const hFolderId = req.headers["x-custom-ai-folder-id"] as string;
+  if (hProvider && hKey) {
+    return {
+      provider: hProvider as any,
+      model: hModel || undefined,
+      api_key: hKey,
+      base_url: hBaseUrl || null,
+      folder_id: hFolderId || null,
+    };
+  }
+  return null;
+}
+
 app.post("/api/ai/decompose", async (req, res) => {
   try {
     const { problem, masteredTopics = [] } = req.body;
@@ -524,6 +552,7 @@ app.post("/api/ai/decompose", async (req, res) => {
 }
 `;
 
+    const customAiConfig = extractCustomAiConfig(req);
     const cacheResult = await executeAiWithCache(
       "decompose",
       { problem: problem.trim().toLowerCase(), masteredTopics: [...masteredTopics].sort() },
@@ -539,7 +568,8 @@ app.post("/api/ai/decompose", async (req, res) => {
           console.warn("[AI Dispatcher] Provider call failed, using high-fidelity fallback:", genErr);
           return createFallbackTree(problem);
         }
-      }
+      },
+      customAiConfig
     );
 
     return res.json({
@@ -597,6 +627,7 @@ app.post("/api/ai/explain-why", async (req, res) => {
 }
 `;
 
+    const customAiConfig = extractCustomAiConfig(req);
     const cacheResult = await executeAiWithCache(
       "explain_why",
       {
@@ -617,7 +648,8 @@ app.post("/api/ai/explain-why", async (req, res) => {
           console.warn("[AI Dispatcher] Provider call failed for explain-why, returning fallback:", genErr);
           return fallbackExplanation;
         }
-      }
+      },
+      customAiConfig
     );
 
     return res.json({
@@ -682,6 +714,7 @@ app.post("/api/ai/diagnose-stuck", async (req, res) => {
 }
 `;
 
+    const customAiConfig = extractCustomAiConfig(req);
     const cacheResult = await executeAiWithCache(
       "diagnose_stuck",
       {
@@ -712,7 +745,8 @@ app.post("/api/ai/diagnose-stuck", async (req, res) => {
           console.warn("[AI Dispatcher] Provider call failed for diagnose-stuck, returning fallback:", genErr);
           return fallbackDiagnosis;
         }
-      }
+      },
+      customAiConfig
     );
 
     return res.json({
@@ -787,6 +821,44 @@ app.post("/api/admin/ai/chat-test", requireAdmin, async (req: AuthRequest, res) 
 
     let targetConfig = config;
     if (!targetConfig || !targetConfig.provider) {
+      targetConfig = await db.getActiveAiConfig();
+    }
+
+    const result = await callProviderChat(messages, targetConfig);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || String(err) });
+  }
+});
+
+// -------------------------------------------------------------
+// User AI Endpoints (BYOK / Personal Settings Verification)
+// -------------------------------------------------------------
+
+// User connection test with specified AI config
+app.post("/api/user/ai/test", aiLimiter, async (req, res) => {
+  try {
+    const config = req.body;
+    if (!config || !config.provider || !config.api_key) {
+      return res.status(400).json({ ok: false, message: "Поля provider и api_key обязательны для проверки" });
+    }
+    const result = await testAiProviderConnection(config);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// User interactive chat test for personal model settings
+app.post("/api/user/ai/chat-test", aiLimiter, async (req, res) => {
+  try {
+    const { messages, config } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "Поле messages обязательно и должно быть массивом" });
+    }
+
+    let targetConfig = config;
+    if (!targetConfig || !targetConfig.provider || !targetConfig.api_key) {
       targetConfig = await db.getActiveAiConfig();
     }
 

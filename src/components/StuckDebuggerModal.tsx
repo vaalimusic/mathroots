@@ -11,6 +11,7 @@ import {
   Compass,
   Loader2
 } from 'lucide-react';
+import { fetchAi } from '../context/UserAiContext';
 
 interface StuckDebuggerModalProps {
   isOpen: boolean;
@@ -61,9 +62,9 @@ export const StuckDebuggerModal: React.FC<StuckDebuggerModalProps> = ({
       targetNodeId: defaultTarget.id,
     };
 
-    // 2. Try calling Gemini API for deep dynamic diagnostic
+    // 2. Try calling Gemini/Provider API for deep dynamic diagnostic
     try {
-      const response = await fetch('/api/ai/diagnose-stuck', {
+      const response = await fetchAi('/api/ai/diagnose-stuck', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
