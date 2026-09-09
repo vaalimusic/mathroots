@@ -310,6 +310,8 @@ export const api = {
     plan: string;
     keyCode: string;
     expiresAt?: string;
+    maxActivations?: number;
+    activationsCount?: number;
     error?: string;
   }> {
     return await apiRequest('/api/license/activate', {

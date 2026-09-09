@@ -15,6 +15,7 @@ import {
   Lightbulb,
   ChevronDown,
   Lock,
+  Layers,
 } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
 

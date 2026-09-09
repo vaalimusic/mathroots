@@ -270,7 +270,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [generatedKey, setGeneratedKey] = useState<any>(null);
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
   const [copiedCustomerMsg, setCopiedCustomerMsg] = useState(false);
-  const [licenseSearch, setLicenseSearch] = useState('');
+  const [licenseFilter, setLicenseFilter] = useState('');
 
   const loadLicenses = async () => {
     setLicenseLoading(true);

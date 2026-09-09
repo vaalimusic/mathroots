@@ -7,7 +7,7 @@ import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-import { initDb, closeDb, db, isDbConnected } from "./server/db";
+import { initDb, closeDb, db, isDbConnected, DbAiConfig } from "./server/db";
 import {
   generateToken,
   hashPassword,

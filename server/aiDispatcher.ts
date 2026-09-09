@@ -49,9 +49,11 @@ export async function executeAiWithCache<T = any>(
       api_key: customConfigOverride!.api_key || '',
       base_url: customConfigOverride!.base_url || null,
       folder_id: customConfigOverride!.folder_id || null,
+      temperature: 0.6,
+      max_tokens: 4096,
       is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: new Date() as any,
+      updated_at: new Date() as any,
     };
   } else {
     try {

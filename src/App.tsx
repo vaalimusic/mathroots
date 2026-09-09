@@ -935,7 +935,7 @@ export default function App() {
         }}
         onSelectTree={(treeId) => {
           setIsWorkoutOpen(false);
-          handleSelectTree(treeId);
+          setActiveTreeId(treeId);
         }}
         onOpenStepSolver={(problem) => {
           setIsWorkoutOpen(false);
