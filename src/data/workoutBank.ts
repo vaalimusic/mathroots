@@ -1223,7 +1223,7 @@ export const HANDCRAFTED_PROBLEMS: WorkoutProblem[] = [
 
   // --- Category: Systems of Linear Equations ---
   {
-    id: 'p_sys_01',
+    id: 'p_sys_03',
     category: 'systems',
     categoryTitle: 'Системы уравнений',
     difficulty: 'basic',
@@ -1253,7 +1253,7 @@ export const HANDCRAFTED_PROBLEMS: WorkoutProblem[] = [
     linkedTreeId: 'linear_mvp',
   },
   {
-    id: 'p_sys_02',
+    id: 'p_sys_04',
     category: 'systems',
     categoryTitle: 'Системы уравнений',
     difficulty: 'advanced',

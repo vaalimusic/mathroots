@@ -500,35 +500,67 @@ export function diagnoseLinearStepError(
   equation: string,
   userStep: string
 ): { isCorrect: boolean; feedback: string; prerequisiteNodeId?: string } {
-  const clean = userStep.replace(/\s+/g, '').toLowerCase();
+  const clean = userStep.replace(/\s+/g, '').toLowerCase().replace(/−/g, '-');
+  const cleanEq = equation.replace(/\s+/g, '').toLowerCase().replace(/−/g, '-');
 
-  // For 2x + 4 = 10
-  if (equation.includes('2x+4=10') || equation.includes('2x + 4 = 10')) {
-    if (clean === '2x=6' || clean === '2*x=6') {
+  // Try to parse linear equation ax + b = c or ax = c
+  const match = cleanEq.match(/^([+-]?\d*)x(?:([+-]\d+))?=([+-]?\d+)$/);
+  if (match) {
+    const rawA = match[1];
+    const a = rawA === '' || rawA === '+' ? 1 : rawA === '-' ? -1 : parseInt(rawA, 10);
+    const b = match[2] ? parseInt(match[2], 10) : 0;
+    const c = parseInt(match[3], 10);
+
+    const stepAfterB = c - b;
+    const root = a !== 0 ? stepAfterB / a : 0;
+
+    // 1. Correct intermediate step: ax = c - b
+    const termA = a === 1 ? 'x' : a === -1 ? '-x' : `${a}x`;
+    const targetAx = `${termA}=${stepAfterB}`;
+    const targetAxMul = a === 1 ? `x=${stepAfterB}` : `${a}*x=${stepAfterB}`;
+
+    if (clean === targetAx || clean === targetAxMul) {
+      const opDesc = b > 0 ? `Вычли ${b}` : b < 0 ? `Прибавили ${Math.abs(b)}` : 'Преобразовали';
       return {
         isCorrect: true,
-        feedback: 'Верно! Вычли 4 из обеих частей уравнения, сохранив равенство.',
+        feedback: `Верно! ${opDesc} с обеих сторон уравнения, сохранив равенство: ${termA} = ${stepAfterB}.`,
       };
     }
-    if (clean === '2x=14' || clean === '2*x=14') {
+
+    // 2. Mistake: added b instead of subtracting (or subtracted instead of adding)
+    const wrongStepB = c + b;
+    if (clean === `${termA}=${wrongStepB}` || clean === `${a}*x=${wrongStepB}`) {
+      const action = b > 0 ? 'сложение вместо вычитания' : 'вычитание вместо сложения';
       return {
         isCorrect: false,
-        feedback:
-          'Похоже, вместо вычитания 4 из правой части выполнено сложение: 10 + 4 = 14. Чтобы убрать слагаемое +4, применяется обратная операция: вычитание (-4).',
+        feedback: `Похоже, выполнено ${action}: ${c} ${b > 0 ? '+' : '-'} ${Math.abs(b)} = ${wrongStepB}. Чтобы убрать ${b > 0 ? `+${b}` : b}, примените обратную операцию!`,
         prerequisiteNodeId: 'node_addition',
       };
     }
-    if (clean === 'x=3') {
+
+    // 3. Final root: x = root
+    const rootStr = Number.isInteger(root) ? root.toString() : root.toFixed(2);
+    if (clean === `x=${rootStr}` || clean === `x=${root}`) {
       return {
         isCorrect: true,
-        feedback: 'Верно! Найден конечный корень x = 3.',
+        feedback: `Верно! Корень уравнения успешно найден: x = ${rootStr}.`,
       };
     }
-    if (clean === 'x=5' || clean === 'x=6') {
+
+    // 4. Mistake: forgot to divide by a (entered x = c - b when a != 1)
+    if (a !== 1 && (clean === `x=${stepAfterB}` || clean === `x=${c}`)) {
       return {
         isCorrect: false,
-        feedback:
-          'Обрати внимание: после получения 2x = 6 необходимо разделить обе части уравнения на коэффициент при x (на 2), то есть 6 / 2 = 3.',
+        feedback: `Обратите внимание: после получения ${termA} = ${stepAfterB} необходимо разделить обе части на коэффициент при x (на ${a}): ${stepAfterB} / ${a} = ${rootStr}.`,
+        prerequisiteNodeId: 'node_distributive_law',
+      };
+    }
+
+    // 5. Mistake: multiplied by a instead of dividing
+    if (a > 1 && clean === `x=${stepAfterB * a}`) {
+      return {
+        isCorrect: false,
+        feedback: `Деление — операция, обратная умножению. Нужно разделить на ${a}, а не умножать: ${stepAfterB} / ${a} = ${rootStr}.`,
         prerequisiteNodeId: 'node_distributive_law',
       };
     }

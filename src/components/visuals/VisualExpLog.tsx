@@ -120,7 +120,7 @@ export const VisualExpLog: React.FC<VisualExpLogProps> = ({
           Экспонента Эйлера e^x (a ≈ 2.718)
         </button>
         <button
-          onClick={() => setPreset(10, 0.8, 'richter')}
+          onClick={() => setPreset(10, 0.5, 'richter')}
           className={`px-3 py-1 text-xs rounded-lg font-semibold transition-all ${
             activeScenario === 'richter'
               ? 'bg-indigo-600 text-white shadow-md'
@@ -254,7 +254,7 @@ export const VisualExpLog: React.FC<VisualExpLogProps> = ({
           <input
             type="range"
             min="0.3"
-            max="4.0"
+            max={Math.max(4.0, base)}
             step="0.05"
             value={base}
             onChange={(e) => {
@@ -267,7 +267,7 @@ export const VisualExpLog: React.FC<VisualExpLogProps> = ({
           <div className="flex justify-between text-[10px] text-slate-500">
             <span>0.3 (Затухание)</span>
             <span>1.0 (Сингулярность)</span>
-            <span>4.0 (Быстрый рост)</span>
+            <span>{Math.max(4.0, base).toFixed(1)} (Быстрый рост)</span>
           </div>
         </div>
 

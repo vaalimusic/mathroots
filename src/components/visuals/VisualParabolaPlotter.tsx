@@ -20,19 +20,43 @@ export const VisualParabolaPlotter: React.FC<VisualParabolaPlotterProps> = ({
   // Discriminant
   const D = b * b - 4 * a * c;
 
-  // Vertex
-  const xv = -b / (2 * a);
+  // Vertex (safe against division by zero if a === 0)
+  const xv = a !== 0 ? -b / (2 * a) : 0;
   const yv = a * xv * xv + b * xv + c;
 
   // Roots
   let roots: number[] = [];
-  if (D > 0) {
-    const r1 = (-b - Math.sqrt(D)) / (2 * a);
-    const r2 = (-b + Math.sqrt(D)) / (2 * a);
-    roots = [Math.min(r1, r2), Math.max(r1, r2)];
-  } else if (D === 0) {
-    roots = [xv];
+  if (a !== 0) {
+    if (D > 0) {
+      const r1 = (-b - Math.sqrt(D)) / (2 * a);
+      const r2 = (-b + Math.sqrt(D)) / (2 * a);
+      roots = [Math.min(r1, r2), Math.max(r1, r2)];
+    } else if (D === 0) {
+      roots = [xv];
+    }
   }
+
+  // Format quadratic equation string
+  const formatFormula = () => {
+    let res = '';
+    if (a === 1) res += 'x²';
+    else if (a === -1) res += '-x²';
+    else if (a !== 0) res += `${a}x²`;
+
+    if (b !== 0) {
+      const sign = b > 0 ? (res ? ' + ' : '') : ' - ';
+      const absB = Math.abs(b);
+      res += `${sign}${absB === 1 ? '' : absB}x`;
+    }
+
+    if (c !== 0) {
+      const sign = c > 0 ? (res ? ' + ' : '') : ' - ';
+      res += `${sign}${Math.abs(c)}`;
+    } else if (!res) {
+      res = '0';
+    }
+    return res;
+  };
 
   // Coordinate system mapping:
   // We want to map mathematical coordinates x in [-4, 8], y in [-4, 10]
@@ -76,10 +100,7 @@ export const VisualParabolaPlotter: React.FC<VisualParabolaPlotterProps> = ({
             Геометрическая модель: График функции и нули
           </div>
           <div className="text-sm font-bold text-white font-mono flex items-center gap-2 mt-0.5">
-            <span>
-              y = {a === 1 ? '' : a === -1 ? '-' : a}x² {b >= 0 ? `+ ${b}x` : `- ${Math.abs(b)}x`}{' '}
-              {c >= 0 ? `+ ${c}` : `- ${Math.abs(c)}`}
-            </span>
+            <span>y = {formatFormula()}</span>
           </div>
         </div>
 
@@ -339,7 +360,14 @@ export const VisualParabolaPlotter: React.FC<VisualParabolaPlotterProps> = ({
 
       {/* Clear Self-Explanatory Summary Box */}
       <div className="p-3 bg-[#0c0f1a] rounded-xl border border-white/[0.06] text-xs text-slate-300 leading-relaxed">
-        <strong>Геометрическая суть корней:</strong> Решить уравнение $x^2 - 5x + 6 = 0$ — это значит найти точки, где парабола опускается до высоты $y = 0$ (пересекает ось $Ox$). В точках $x = 2$ и $x = 3$ высота равна строго $0$!
+        <strong>Геометрическая суть корней:</strong> Решить уравнение <span className="font-mono text-indigo-300 font-semibold">{formatFormula()} = 0</span> — это значит найти точки, где парабола опускается до высоты <span className="font-mono text-emerald-400">y = 0</span> (пересекает ось <span className="font-mono">Ox</span>).{' '}
+        {roots.length === 2 ? (
+          <span>В точках <span className="font-mono text-emerald-400 font-bold">x = {roots[0].toFixed(1)}</span> и <span className="font-mono text-emerald-400 font-bold">x = {roots[1].toFixed(1)}</span> высота равна строго 0!</span>
+        ) : roots.length === 1 ? (
+          <span>В вершине <span className="font-mono text-emerald-400 font-bold">x = {roots[0].toFixed(1)}</span> парабола касается оси Ox (ровно 1 корень)!</span>
+        ) : (
+          <span className="text-rose-300">Парабола висит в воздухе и не пересекает ось Ox (действительных корней нет, D &lt; 0).</span>
+        )}
       </div>
     </div>
   );

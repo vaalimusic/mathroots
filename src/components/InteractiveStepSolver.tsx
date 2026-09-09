@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MathNode, MathTree, PresentationMode } from '../types';
-import { renderTeX, diagnoseLinearStepError } from '../utils/mathEngine';
+import { renderTeX, diagnoseLinearStepError, checkMathAnswer } from '../utils/mathEngine';
 import { MathFormula } from './MathFormula';
 import { AudioVoiceNarrator } from './AudioVoiceNarrator';
 import {
@@ -287,13 +287,11 @@ export const InteractiveStepSolver: React.FC<InteractiveStepSolverProps> = ({
 
     const cleanedUser = userCustomInput.trim().toLowerCase().replace(/\s+/g, '');
 
-    // If practice exercise answer exists, test against it
+    // 1. If practice exercise answer exists, test against it
     if (currentNode.practiceExercise) {
-      const cleanedExpected = currentNode.practiceExercise.expectedAnswer
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '');
-      if (cleanedUser === cleanedExpected || cleanedUser.includes(cleanedExpected)) {
+      const expected = currentNode.practiceExercise.expectedAnswer;
+      const cleanedExpected = expected.trim().toLowerCase().replace(/\s+/g, '');
+      if (cleanedUser === cleanedExpected || cleanedUser.includes(cleanedExpected) || checkMathAnswer(userCustomInput, expected)) {
         setVerificationFeedback({
           status: 'correct',
           text: 'Отлично! Ответ абсолютно верный! Переход выполнен строго по правилу.',
@@ -303,7 +301,20 @@ export const InteractiveStepSolver: React.FC<InteractiveStepSolverProps> = ({
       }
     }
 
-    // Default linear step diagnostic
+    // 2. Check if user entered the next step from steps
+    if (steps && currentStepIndex < steps.length - 1) {
+      const nextStep = steps[currentStepIndex + 1];
+      if (nextStep && (checkMathAnswer(userCustomInput, nextStep.equation) || checkMathAnswer(userCustomInput, nextStep.rightSide))) {
+        setVerificationFeedback({
+          status: 'correct',
+          text: `Отлично! Вы верно получили следующий шаг уравнения: ${nextStep.equation}`,
+        });
+        setCurrentStepIndex((prev) => prev + 1);
+        return;
+      }
+    }
+
+    // 3. Dynamic linear step diagnostic
     const result = diagnoseLinearStepError(currentNode.formula || '2x + 4 = 10', userCustomInput);
     if (result.isCorrect) {
       setVerificationFeedback({

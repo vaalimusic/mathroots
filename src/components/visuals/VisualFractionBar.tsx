@@ -41,7 +41,7 @@ export const VisualFractionBar: React.FC = () => {
               : 'bg-[#0e121e] text-slate-400 border-white/[0.08] hover:text-white'
           }`}
         >
-          {showCommonSubdivision ? 'Сетка шестых (НОК)' : 'Исходные полосы'}
+          {showCommonSubdivision ? `Сетка 1/${commonDen} (НОК)` : 'Исходные полосы'}
         </button>
       </div>
 
@@ -64,7 +64,7 @@ export const VisualFractionBar: React.FC = () => {
                     isActive ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-600'
                   }`}
                 >
-                  {showCommonSubdivision ? '1/6' : '1/2'}
+                  {showCommonSubdivision ? `1/${commonDen}` : `1/${f1Den}`}
                 </div>
               );
             })}
@@ -88,7 +88,7 @@ export const VisualFractionBar: React.FC = () => {
                     isActive ? 'bg-purple-600 text-white' : 'bg-transparent text-slate-600'
                   }`}
                 >
-                  {showCommonSubdivision ? '1/6' : '1/3'}
+                  {showCommonSubdivision ? `1/${commonDen}` : `1/${f2Den}`}
                 </div>
               );
             })}
@@ -98,7 +98,7 @@ export const VisualFractionBar: React.FC = () => {
         {/* Sum Combined Strip */}
         <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
           <div className="flex justify-between text-xs font-mono text-emerald-300 font-bold">
-            <span>Результат суммы: {conv1Num} шестых + {conv2Num} шестых = {sumNum}/{commonDen}</span>
+            <span>Результат суммы: {conv1Num} долей + {conv2Num} долей = {sumNum}/{commonDen}</span>
             <span>{((sumNum / commonDen) * 100).toFixed(0)}% целого</span>
           </div>
           <div className="h-10 w-full bg-[#121626] rounded-lg border border-emerald-500/30 overflow-hidden flex shadow-lg shadow-emerald-500/10">
@@ -119,7 +119,7 @@ export const VisualFractionBar: React.FC = () => {
                       : 'bg-transparent text-slate-600'
                   }`}
                 >
-                  {isFilled ? '1/6' : ''}
+                  {isFilled ? `1/${commonDen}` : ''}
                 </div>
               );
             })}
@@ -127,10 +127,33 @@ export const VisualFractionBar: React.FC = () => {
         </div>
       </div>
 
+      {/* Interactive Fraction Presets */}
+      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+        <span className="text-[11px] font-semibold text-slate-400 mr-1">Примеры:</span>
+        <button
+          onClick={() => { setF1Num(1); setF1Den(2); setF2Num(1); setF2Den(3); }}
+          className="px-2 py-0.5 rounded text-[11px] font-mono bg-white/[0.05] hover:bg-white/[0.1] text-indigo-300"
+        >
+          1/2 + 1/3 (шестые)
+        </button>
+        <button
+          onClick={() => { setF1Num(1); setF1Den(4); setF2Num(1); setF2Den(2); }}
+          className="px-2 py-0.5 rounded text-[11px] font-mono bg-white/[0.05] hover:bg-white/[0.1] text-indigo-300"
+        >
+          1/4 + 1/2 (четвертые)
+        </button>
+        <button
+          onClick={() => { setF1Num(2); setF1Den(3); setF2Num(1); setF2Den(6); }}
+          className="px-2 py-0.5 rounded text-[11px] font-mono bg-white/[0.05] hover:bg-white/[0.1] text-indigo-300"
+        >
+          2/3 + 1/6 (шестые)
+        </button>
+      </div>
+
       {/* Warning Box on Common Misconception */}
       <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 text-xs text-rose-200 leading-relaxed">
         <strong>Главная ловушка у новичков:</strong> Ни в коем случае нельзя складывать числители и знаменатели: $1/2 + 1/3 \ne 2/5$! 
-        Полоса $2/5$ — это меньше половины, а $1/2$ уже занимает пол-линейки. Правильный путь — нарезать обе полоски на одинаковые дольки (шестые части) и сложить их: $3/6 + 2/6 = 5/6$.
+        Полоса $2/5$ — это меньше половины, а $1/2$ уже занимает пол-линейки. Правильный путь — нарезать обе полоски на одинаковые дольки (общий знаменатель {commonDen}) и сложить их: ${conv1Num}/{commonDen} + {conv2Num}/{commonDen} = {sumNum}/{commonDen}$.
       </div>
     </div>
   );

@@ -39,76 +39,143 @@ export const VisualPythagoras: React.FC = () => {
       </div>
 
       {/* SVG Canvas for Triangle & Squares */}
-      <div className="relative w-full h-64 bg-[#04060a] rounded-xl overflow-hidden border border-white/[0.05] flex items-center justify-center p-2">
-        <svg viewBox="0 0 380 240" className="w-full h-full max-w-[400px]">
-          {/* Base corner at (140, 160) */}
-          {/* Right triangle points: Corner (140, 160), Top (140, 90) [a = 70px], Right (230, 160) [b = 90px] */}
+      <div className="relative w-full h-72 bg-[#04060a] rounded-xl overflow-hidden border border-white/[0.05] flex items-center justify-center p-2">
+        {(() => {
+          const scale = 14;
+          const x0 = 135;
+          const y0 = 190;
+          const aPx = a * scale;
+          const bPx = b * scale;
 
-          {/* Square on side a (left side): x from 70 to 140, y from 90 to 160 */}
-          <rect
-            x="70"
-            y="90"
-            width="70"
-            height="70"
-            fill="rgba(99, 102, 241, 0.25)"
-            stroke="#818cf8"
-            strokeWidth="1.5"
-            rx="3"
-          />
-          <text x="105" y="130" fill="#c7d2fe" fontSize="13" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-            a² = {a2}
-          </text>
+          // Points
+          const ptC = { x: x0, y: y0 };
+          const ptA = { x: x0, y: y0 - aPx };
+          const ptB = { x: x0 + bPx, y: y0 };
+          const ptBPrime = { x: x0 + bPx + aPx, y: y0 - bPx };
+          const ptAPrime = { x: x0 + aPx, y: y0 - aPx - bPx };
 
-          {/* Square on side b (bottom side): x from 140 to 230, y from 160 to 230 */}
-          <rect
-            x="140"
-            y="160"
-            width="90"
-            height="70"
-            fill="rgba(16, 185, 129, 0.25)"
-            stroke="#34d399"
-            strokeWidth="1.5"
-            rx="3"
-          />
-          <text x="185" y="200" fill="#a7f3d0" fontSize="13" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-            b² = {b2}
-          </text>
+          const cCenterX = x0 + (aPx + bPx) / 2;
+          const cCenterY = y0 - (aPx + bPx) / 2;
 
-          {/* Right Triangle itself */}
-          <polygon
-            points="140,160 140,90 230,160"
-            fill="#1e293b"
-            stroke="#ffffff"
-            strokeWidth="2"
-          />
+          return (
+            <svg viewBox="0 0 410 290" className="w-full h-full max-w-[430px]">
+              {/* Square on side a (left side) */}
+              <rect
+                x={x0 - aPx}
+                y={y0 - aPx}
+                width={aPx}
+                height={aPx}
+                fill="rgba(99, 102, 241, 0.25)"
+                stroke="#818cf8"
+                strokeWidth="1.5"
+                rx="3"
+              />
+              <text
+                x={x0 - aPx / 2}
+                y={y0 - aPx / 2 + 5}
+                fill="#c7d2fe"
+                fontSize={aPx > 40 ? '12' : '10'}
+                fontWeight="bold"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                a² = {a2}
+              </text>
 
-          {/* Right angle symbol at (140, 160) */}
-          <polyline points="140,148 152,148 152,160" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+              {/* Square on side b (bottom side) */}
+              <rect
+                x={x0}
+                y={y0}
+                width={bPx}
+                height={bPx}
+                fill="rgba(16, 185, 129, 0.25)"
+                stroke="#34d399"
+                strokeWidth="1.5"
+                rx="3"
+              />
+              <text
+                x={x0 + bPx / 2}
+                y={y0 + bPx / 2 + 5}
+                fill="#a7f3d0"
+                fontSize={bPx > 40 ? '12' : '10'}
+                fontWeight="bold"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                b² = {b2}
+              </text>
 
-          {/* Square on Hypotenuse c (angled) */}
-          {/* Hypotenuse vector from (140, 90) to (230, 160): dx = 90, dy = 70 */}
-          {/* Normal pointing outside: (-dy, dx) -> (-70, 90) or (70, -90) */}
-          <polygon
-            points="140,90 230,160 300,70 210,0"
-            fill="rgba(245, 158, 11, 0.2)"
-            stroke="#fbbf24"
-            strokeWidth="1.5"
-          />
-          <text x="220" y="85" fill="#fde68a" fontSize="13" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-            c² = {c2}
-          </text>
+              {/* Square on Hypotenuse c (angled) */}
+              <polygon
+                points={`${ptA.x},${ptA.y} ${ptB.x},${ptB.y} ${ptBPrime.x},${ptBPrime.y} ${ptAPrime.x},${ptAPrime.y}`}
+                fill="rgba(245, 158, 11, 0.2)"
+                stroke="#fbbf24"
+                strokeWidth="1.5"
+              />
+              <text
+                x={cCenterX}
+                y={cCenterY + 4}
+                fill="#fde68a"
+                fontSize="12"
+                fontWeight="bold"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                c² = {c2}
+              </text>
 
-          {/* Labels on sides */}
-          <text x="148" y="125" fill="#a5b4fc" fontSize="11" fontWeight="bold" fontFamily="monospace">
-            a={a}
-          </text>
-          <text x="180" y="152" fill="#6ee7b7" fontSize="11" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-            b={b}
-          </text>
-          <text x="195" y="120" fill="#fcd34d" fontSize="11" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-            c={c.toFixed(1)}
-          </text>
-        </svg>
+              {/* Right Triangle itself */}
+              <polygon
+                points={`${ptC.x},${ptC.y} ${ptA.x},${ptA.y} ${ptB.x},${ptB.y}`}
+                fill="#1e293b"
+                stroke="#ffffff"
+                strokeWidth="2"
+              />
+
+              {/* Right angle symbol at C */}
+              <polyline
+                points={`${x0},${y0 - 10} ${x0 + 10},${y0 - 10} ${x0 + 10},${y0}`}
+                fill="none"
+                stroke="#94a3b8"
+                strokeWidth="1.5"
+              />
+
+              {/* Labels on sides */}
+              <text
+                x={x0 + 6}
+                y={y0 - aPx / 2}
+                fill="#a5b4fc"
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+              >
+                a={a}
+              </text>
+              <text
+                x={x0 + bPx / 2}
+                y={y0 - 6}
+                fill="#6ee7b7"
+                fontSize="11"
+                fontWeight="bold"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                b={b}
+              </text>
+              <text
+                x={(ptA.x + ptB.x) / 2 + 12}
+                y={(ptA.y + ptB.y) / 2 - 8}
+                fill="#fcd34d"
+                fontSize="11"
+                fontWeight="bold"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                c={c.toFixed(1)}
+              </text>
+            </svg>
+          );
+        })()}
       </div>
 
       {/* Sliders for legs a and b */}

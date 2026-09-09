@@ -82,7 +82,11 @@ export const VisualTrigCircle: React.FC<VisualTrigCircleProps> = ({ initialAngle
           <text x={center + 6} y={center + radius + 12} fill="#64748b" fontSize="9" fontFamily="monospace">-1</text>
 
           {/* Angle sector arc */}
-          <path d={arcPath} fill="#f43f5e" fillOpacity="0.25" stroke="#f43f5e" strokeWidth="1.5" />
+          {angleDeg === 360 ? (
+            <circle cx={center} cy={center} r={arcRadius} fill="#f43f5e" fillOpacity="0.25" stroke="#f43f5e" strokeWidth="1.5" />
+          ) : angleDeg > 0 ? (
+            <path d={arcPath} fill="#f43f5e" fillOpacity="0.25" stroke="#f43f5e" strokeWidth="1.5" />
+          ) : null}
 
           {/* Right Triangle formed by projection */}
           {/* Horizontal leg (cos x) */}
