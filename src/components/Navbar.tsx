@@ -22,7 +22,10 @@ import {
   User,
   Share2,
   Shield,
+  Crown,
+  Lock,
 } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
 
 interface NavbarProps {
   trees: MathTree[];
@@ -95,6 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectNode,
   onQuickSolve,
 }) => {
+  const { isPro, openUpgradeModal } = useLicense();
   const [quickInput, setQuickInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
@@ -757,6 +761,24 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Plus className="w-3.5 h-3.5 text-emerald-200" />
           <span className="hidden sm:inline">Конструктор</span>
+        </button>
+
+        {/* PRO License Upgrade / Status Button */}
+        <button
+          id="btn-open-license-upgrade"
+          type="button"
+          onClick={() => openUpgradeModal()}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+            isPro
+              ? 'bg-gradient-to-r from-amber-500/20 to-indigo-600/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+              : 'bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-md shadow-indigo-950/40 border border-amber-300/30 animate-pulse'
+          }`}
+          title={isPro ? 'Подписка PRO активна (нажмите для просмотра)' : 'Активировать полный доступ PRO'}
+        >
+          <Crown className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+          <span className="font-extrabold tracking-tight">
+            {isPro ? '👑 PRO' : '✨ PRO'}
+          </span>
         </button>
 
         {/* Profile / Auth Button */}

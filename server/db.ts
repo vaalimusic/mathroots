@@ -66,6 +66,20 @@ export interface DbNodeMastery {
   last_tested_at: Date;
 }
 
+export interface DbLicenseKey {
+  id: string;
+  key_code: string;
+  plan: 'pro_month' | 'pro_year' | 'pro_lifetime' | 'tutor_school';
+  status: 'active' | 'revoked' | 'expired';
+  max_activations: number;
+  activations_count: number;
+  activated_by: Array<{ userId?: string; activatedAt: string; ip?: string }>;
+  expires_at: Date | null;
+  notes: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
 let pool: Pool | null = null;
 let isConnected = false;
 
@@ -80,6 +94,7 @@ const inMemoryStore = {
   canvasLayouts: new Map<string, any>(),
   aiConfigs: new Map<string, DbAiConfig>(),
   aiResponseCache: new Map<string, DbAiCache>(),
+  licenseKeys: new Map<string, DbLicenseKey>(),
 };
 
 export async function initDb(): Promise<boolean> {
@@ -208,11 +223,26 @@ export async function initDb(): Promise<boolean> {
         last_accessed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS license_keys (
+        id VARCHAR(64) PRIMARY KEY,
+        key_code VARCHAR(100) UNIQUE NOT NULL,
+        plan VARCHAR(50) NOT NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        max_activations INT DEFAULT 1,
+        activations_count INT DEFAULT 0,
+        activated_by JSONB DEFAULT '[]'::jsonb,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE INDEX IF NOT EXISTS idx_node_masteries_user ON node_masteries(user_id);
       CREATE INDEX IF NOT EXISTS idx_custom_trees_user ON custom_trees(user_id);
       CREATE INDEX IF NOT EXISTS idx_custom_trees_slug ON custom_trees(share_slug);
       CREATE INDEX IF NOT EXISTS idx_ai_cache_key ON ai_response_cache(cache_key);
       CREATE INDEX IF NOT EXISTS idx_ai_cache_type ON ai_response_cache(prompt_type);
+      CREATE INDEX IF NOT EXISTS idx_license_keys_code ON license_keys(key_code);
     `);
 
     client.release();
@@ -891,5 +921,193 @@ export const db = {
     } else {
       inMemoryStore.aiResponseCache.clear();
     }
+  },
+
+  // -------------------------------------------------------------
+  // License Keys & Monetization Operations
+  // -------------------------------------------------------------
+  async createLicenseKey(data: {
+    keyCode: string;
+    plan: 'pro_month' | 'pro_year' | 'pro_lifetime' | 'tutor_school';
+    maxActivations?: number;
+    expiresAt?: Date | null;
+    notes?: string | null;
+  }): Promise<DbLicenseKey> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    const keyEntry: DbLicenseKey = {
+      id,
+      key_code: data.keyCode.trim().toUpperCase(),
+      plan: data.plan,
+      status: 'active',
+      max_activations: data.maxActivations ?? 1,
+      activations_count: 0,
+      activated_by: [],
+      expires_at: data.expiresAt ?? null,
+      notes: data.notes?.trim() || null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (isConnected && pool) {
+      await pool.query(
+        `INSERT INTO license_keys (id, key_code, plan, status, max_activations, activations_count, activated_by, expires_at, notes, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          keyEntry.id,
+          keyEntry.key_code,
+          keyEntry.plan,
+          keyEntry.status,
+          keyEntry.max_activations,
+          keyEntry.activations_count,
+          JSON.stringify(keyEntry.activated_by),
+          keyEntry.expires_at,
+          keyEntry.notes,
+          keyEntry.created_at,
+          keyEntry.updated_at,
+        ]
+      );
+    } else {
+      inMemoryStore.licenseKeys.set(keyEntry.key_code, keyEntry);
+    }
+    return keyEntry;
+  },
+
+  async getLicenseKeyByCode(rawCode: string): Promise<DbLicenseKey | null> {
+    const code = rawCode.trim().toUpperCase();
+    if (isConnected && pool) {
+      const res = await pool.query(`SELECT * FROM license_keys WHERE key_code = $1`, [code]);
+      if (res.rows.length === 0) return null;
+      const row = res.rows[0];
+      return {
+        ...row,
+        activated_by: typeof row.activated_by === 'string' ? JSON.parse(row.activated_by) : row.activated_by || [],
+      };
+    }
+    return inMemoryStore.licenseKeys.get(code) || null;
+  },
+
+  async listLicenseKeys(limit = 100): Promise<DbLicenseKey[]> {
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `SELECT * FROM license_keys ORDER BY created_at DESC LIMIT $1`,
+        [limit]
+      );
+      return res.rows.map(row => ({
+        ...row,
+        activated_by: typeof row.activated_by === 'string' ? JSON.parse(row.activated_by) : row.activated_by || [],
+      }));
+    }
+    return Array.from(inMemoryStore.licenseKeys.values())
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit);
+  },
+
+  async updateLicenseKeyStatus(code: string, status: 'active' | 'revoked' | 'expired'): Promise<boolean> {
+    const norm = code.trim().toUpperCase();
+    const now = new Date();
+    if (isConnected && pool) {
+      const res = await pool.query(
+        `UPDATE license_keys SET status = $1, updated_at = $2 WHERE key_code = $3`,
+        [status, now, norm]
+      );
+      return (res.rowCount ?? 0) > 0;
+    }
+    const item = inMemoryStore.licenseKeys.get(norm);
+    if (!item) return false;
+    item.status = status;
+    item.updated_at = now;
+    return true;
+  },
+
+  async deleteLicenseKey(code: string): Promise<boolean> {
+    const norm = code.trim().toUpperCase();
+    if (isConnected && pool) {
+      const res = await pool.query(`DELETE FROM license_keys WHERE key_code = $1`, [norm]);
+      return (res.rowCount ?? 0) > 0;
+    }
+    return inMemoryStore.licenseKeys.delete(norm);
+  },
+
+  async activateLicenseKey(
+    rawCode: string,
+    meta: { userId?: string; ip?: string } = {}
+  ): Promise<{ success: boolean; error?: string; key?: DbLicenseKey }> {
+    const norm = rawCode.trim().toUpperCase();
+    const key = await this.getLicenseKeyByCode(norm);
+    if (!key) {
+      return { success: false, error: 'Лицензионный ключ не найден. Проверьте правильность ввода.' };
+    }
+
+    if (key.status !== 'active') {
+      return {
+        success: false,
+        error: key.status === 'revoked' ? 'Этот лицензионный ключ был аннулирован администратором.' : 'Срок действия ключа истек.',
+      };
+    }
+
+    if (key.expires_at && new Date(key.expires_at) < new Date()) {
+      await this.updateLicenseKeyStatus(norm, 'expired');
+      return { success: false, error: 'Срок действия этой лицензии уже истек.' };
+    }
+
+    if (key.activations_count >= key.max_activations) {
+      return {
+        success: false,
+        error: `Лимит активаций для этого ключа исчерпан (${key.activations_count}/${key.max_activations}).`,
+      };
+    }
+
+    const now = new Date();
+    key.activations_count += 1;
+    const activationRecord = {
+      userId: meta.userId,
+      ip: meta.ip,
+      activatedAt: now.toISOString(),
+    };
+    key.activated_by = Array.isArray(key.activated_by) ? [...key.activated_by, activationRecord] : [activationRecord];
+    key.updated_at = now;
+
+    if (isConnected && pool) {
+      await pool.query(
+        `UPDATE license_keys
+         SET activations_count = $1, activated_by = $2, updated_at = $3
+         WHERE key_code = $4`,
+        [key.activations_count, JSON.stringify(key.activated_by), now, norm]
+      );
+    } else {
+      inMemoryStore.licenseKeys.set(norm, key);
+    }
+
+    return { success: true, key };
+  },
+
+  async getLicenseStats(): Promise<{
+    totalKeys: number;
+    activeKeys: number;
+    revokedKeys: number;
+    totalActivations: number;
+    byPlan: Record<string, number>;
+  }> {
+    const keys = await this.listLicenseKeys(1000);
+    let activeKeys = 0;
+    let revokedKeys = 0;
+    let totalActivations = 0;
+    const byPlan: Record<string, number> = {};
+
+    for (const k of keys) {
+      if (k.status === 'active') activeKeys++;
+      if (k.status === 'revoked') revokedKeys++;
+      totalActivations += k.activations_count;
+      byPlan[k.plan] = (byPlan[k.plan] || 0) + 1;
+    }
+
+    return {
+      totalKeys: keys.length,
+      activeKeys,
+      revokedKeys,
+      totalActivations,
+      byPlan,
+    };
   },
 };

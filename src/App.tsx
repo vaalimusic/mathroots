@@ -24,6 +24,8 @@ import { AuthModal } from './components/AuthModal';
 import { ShareTreeModal } from './components/ShareTreeModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { PlatformGuideModal } from './components/PlatformGuideModal';
+import { LicenseModal } from './components/LicenseModal';
+import { useLicense } from './context/LicenseContext';
 import {
   Sparkles,
   TreeDeciduous,
@@ -868,6 +870,9 @@ export default function App() {
           setCurrentView('steps');
         }}
       />
+
+      {/* License & Monetization Modal */}
+      <LicenseModal />
 
       {/* Shared Tree Notification Toast */}
       {sharedToast && (

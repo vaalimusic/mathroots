@@ -31,7 +31,10 @@ import {
   Award,
   RefreshCw,
   Scale,
+  Lock,
+  Crown,
 } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
 
 interface TreeWorkoutModalProps {
   isOpen: boolean;
@@ -60,6 +63,7 @@ export const TreeWorkoutModal: React.FC<TreeWorkoutModalProps> = ({
   onSelectTree,
   onOpenStepSolver,
 }) => {
+  const { isPro, openUpgradeModal } = useLicense();
   // Navigation Tabs: Trainer, Library of Breakdowns, Infinite Generator, Interactive Balance Lab
   const [activeTab, setActiveTab] = useState<WorkoutTab>('trainer');
 
@@ -497,15 +501,25 @@ export const TreeWorkoutModal: React.FC<TreeWorkoutModalProps> = ({
             </button>
 
             <button
-              onClick={() => setActiveTab('generator')}
+              onClick={() => {
+                if (!isPro) {
+                  openUpgradeModal('Генератор примеров на лету');
+                } else {
+                  setActiveTab('generator');
+                }
+              }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                 activeTab === 'generator'
                   ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                  : isPro
+                  ? 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                  : 'text-amber-300 hover:text-amber-200 hover:bg-amber-500/10'
               }`}
+              title={isPro ? 'Бесконечный процедурный генератор примеров' : 'Генератор доступен в версии PRO'}
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>🎲 Генератор на лету</span>
+              {!isPro && <Lock className="w-3 h-3 text-amber-300 ml-0.5" />}
             </button>
 
             <button

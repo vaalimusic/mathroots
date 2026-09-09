@@ -29,7 +29,10 @@ import {
   MessageSquare,
   Send,
   Bot,
-  User
+  User,
+  Crown,
+  Lock,
+  Ban
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -181,7 +184,7 @@ export const PROXY_PRESETS: ProxyPreset[] = [
   },
 ];
 
-export type AdminTab = 'providers' | 'chat_test' | 'cache' | 'system';
+export type AdminTab = 'providers' | 'chat_test' | 'cache' | 'system' | 'licenses';
 
 export interface ChatMessage {
   id: string;
@@ -241,9 +244,76 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // License & Monetization State
+  const [licenses, setLicenses] = useState<any[]>([]);
+  const [licenseStats, setLicenseStats] = useState<any>(null);
+  const [licenseLoading, setLicenseLoading] = useState(false);
+  const [genPlan, setGenPlan] = useState<'pro_month' | 'pro_year' | 'pro_lifetime' | 'tutor_school'>('pro_year');
+  const [genMaxActivations, setGenMaxActivations] = useState(1);
+  const [genNotes, setGenNotes] = useState('');
+  const [generatedKey, setGeneratedKey] = useState<any>(null);
+  const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
+  const [copiedCustomerMsg, setCopiedCustomerMsg] = useState(false);
+  const [licenseSearch, setLicenseSearch] = useState('');
+
+  const loadLicenses = async () => {
+    setLicenseLoading(true);
+    try {
+      const res = await api.getAdminLicenses();
+      if (res?.success) {
+        setLicenses(res.keys || []);
+        setLicenseStats(res.stats || null);
+      }
+    } catch (err) {
+      console.error('Failed to load licenses:', err);
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
+
+  const handleGenerateKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.generateAdminLicense({
+        plan: genPlan,
+        maxActivations: Number(genMaxActivations) || 1,
+        notes: genNotes,
+      });
+      if (res?.success) {
+        setGeneratedKey(res.key);
+        setGeneratedMessage(res.customerMessage);
+        setGenNotes('');
+        loadLicenses();
+      }
+    } catch (err: any) {
+      alert('Ошибка генерации ключа: ' + (err.message || String(err)));
+    }
+  };
+
+  const handleToggleKey = async (code: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'revoked' : 'active';
+    try {
+      await api.toggleAdminLicense(code, newStatus);
+      loadLicenses();
+    } catch (err: any) {
+      alert('Ошибка изменения статуса: ' + (err.message || String(err)));
+    }
+  };
+
+  const handleDeleteKey = async (code: string) => {
+    if (!confirm(`Вы действительно хотите удалить лицензионный ключ ${code}?`)) return;
+    try {
+      await api.deleteAdminLicense(code);
+      loadLicenses();
+    } catch (err: any) {
+      alert('Ошибка удаления: ' + (err.message || String(err)));
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadData();
+      loadLicenses();
     }
   }, [isOpen]);
 
@@ -594,6 +664,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               >
                 <Server className="w-3.5 h-3.5" />
                 <span>Система</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('licenses')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'licenses'
+                    ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-md'
+                    : 'text-amber-400 hover:text-white'
+                }`}
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-300" />
+                <span>Лицензии PRO</span>
               </button>
             </div>
 
@@ -1350,6 +1432,349 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     <span className="text-slate-400">Защита API:</span>
                     <div className="font-bold text-indigo-400 mt-0.5">Rate Limit + JWT + bcrypt</div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: LICENSES & MONETIZATION */}
+          {activeTab === 'licenses' && (
+            <div className="space-y-6">
+              {/* Revenue & Key Statistics */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-[#070911] border border-white/[0.08]">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Всего ключей</span>
+                  </div>
+                  <div className="text-xl font-black text-white mt-1">
+                    {licenseStats?.totalKeys || licenses.length}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#070911] border border-white/[0.08]">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Активных лицензий</span>
+                  </div>
+                  <div className="text-xl font-black text-emerald-400 mt-1">
+                    {licenseStats?.activeKeys || licenses.filter((k) => k.status === 'active').length}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#070911] border border-white/[0.08]">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Всего активаций</span>
+                  </div>
+                  <div className="text-xl font-black text-amber-400 mt-1">
+                    {licenseStats?.totalActivations || licenses.reduce((sum, k) => sum + (k.activations_count || 0), 0)}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-gradient-to-tr from-amber-500/10 to-indigo-600/10 border border-amber-500/30">
+                  <div className="text-[11px] text-amber-300 flex items-center gap-1.5 font-semibold">
+                    <Coins className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Оценочный доход</span>
+                  </div>
+                  <div className="text-xl font-black text-white mt-1">
+                    {(
+                      (licenseStats?.byPlan?.pro_month || 0) * 490 +
+                      (licenseStats?.byPlan?.pro_year || 0) * 2490 +
+                      (licenseStats?.byPlan?.pro_lifetime || 0) * 4990 +
+                      (licenseStats?.byPlan?.tutor_school || 0) * 7990
+                    ).toLocaleString('ru-RU')}{' '}
+                    ₽
+                  </div>
+                </div>
+              </div>
+
+              {/* Generator Card */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-[#070911] border border-indigo-500/30 space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                      <Crown className="w-4 h-4 text-amber-200" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Генератор лицензионных ключей PRO</h3>
+                      <p className="text-xs text-slate-400">
+                        Создайте ключ для покупателя и отправьте ему в 1 клик
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handleGenerateKey} className="space-y-4">
+                  {/* Plan Selection Buttons */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300">Выберите тарифный план:</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { id: 'pro_month', name: 'PRO Месяц (490 ₽)', desc: '30 дней' },
+                        { id: 'pro_year', name: 'PRO Год (2 490 ₽)', desc: '365 дней • ХИТ', highlight: true },
+                        { id: 'pro_lifetime', name: 'PRO Навсегда (4 990 ₽)', desc: 'Бессрочно' },
+                        { id: 'tutor_school', name: 'Школа / Репетитор (7 990 ₽)', desc: '25 мест' },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setGenPlan(p.id as any);
+                            if (p.id === 'tutor_school') setGenMaxActivations(25);
+                            else setGenMaxActivations(1);
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all relative ${
+                            genPlan === p.id
+                              ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-lg shadow-indigo-950/50'
+                              : 'bg-[#0c1020] border-white/[0.08] text-slate-300 hover:border-white/[0.2]'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">{p.name}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{p.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300">Лимит активаций:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={genMaxActivations}
+                        onChange={(e) => setGenMaxActivations(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-3 py-2 bg-[#0c1020] border border-white/[0.1] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 space-y-1">
+                      <label className="text-xs font-semibold text-slate-300">
+                        Кому выдан / Примечание:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Например: СБП перевод от Иванова И., @telegram_user"
+                        value={genNotes}
+                        onChange={(e) => setGenNotes(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#0c1020] border border-white/[0.1] rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-200" />
+                    <span>Сгенерировать лицензионный ключ</span>
+                  </button>
+                </form>
+
+                {/* Generated Key Presentation Box */}
+                {generatedKey && (
+                  <div className="p-4 rounded-xl bg-[#0c1020] border-2 border-emerald-500/50 space-y-3 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Ключ успешно создан!
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-400">
+                        {generatedKey.expires_at ? `До: ${new Date(generatedKey.expires_at).toLocaleDateString('ru-RU')}` : 'Бессрочно'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 p-3 bg-black/60 rounded-xl border border-emerald-500/30 text-white font-mono text-sm tracking-wider font-bold">
+                        {generatedKey.key_code}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedKey.key_code);
+                          setCopiedKey(generatedKey.key_code);
+                          setTimeout(() => setCopiedKey(null), 2000);
+                        }}
+                        className="px-3.5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                      >
+                        {copiedKey === generatedKey.key_code ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedKey === generatedKey.key_code ? 'Скопирован!' : 'Копировать'}</span>
+                      </button>
+                    </div>
+
+                    {generatedMessage && (
+                      <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-2">
+                        <span className="text-xs text-slate-400">Готовое приветственное сообщение для покупателя:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedMessage);
+                            setCopiedCustomerMsg(true);
+                            setTimeout(() => setCopiedCustomerMsg(false), 2500);
+                          }}
+                          className="text-xs text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          {copiedCustomerMsg ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedCustomerMsg ? 'Сообщение скопировано!' : 'Скопировать текст клиенту'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* License Registry & Table */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-[#070911] border border-white/[0.08] space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Key className="w-4 h-4 text-indigo-400" />
+                      <span>Реестр лицензий ({licenses.length})</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Управление активными, истекшими и заблокированными ключами
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Поиск по ключу или заметке..."
+                        value={licenseFilter}
+                        onChange={(e) => setLicenseFilter(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 bg-[#0c1020] border border-white/[0.1] rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={loadLicenses}
+                      disabled={licenseLoading}
+                      className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-colors shrink-0"
+                      title="Обновить список"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${licenseLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/[0.08] text-slate-400 font-semibold">
+                        <th className="py-2.5 px-3">Код ключа</th>
+                        <th className="py-2.5 px-3">Тариф</th>
+                        <th className="py-2.5 px-3">Статус</th>
+                        <th className="py-2.5 px-3">Активаций</th>
+                        <th className="py-2.5 px-3">Истекает</th>
+                        <th className="py-2.5 px-3">Примечание</th>
+                        <th className="py-2.5 px-3 text-right">Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.04]">
+                      {licenses
+                        .filter(
+                          (k) =>
+                            !licenseFilter ||
+                            k.key_code.toLowerCase().includes(licenseFilter.toLowerCase()) ||
+                            (k.notes && k.notes.toLowerCase().includes(licenseFilter.toLowerCase()))
+                        )
+                        .map((k) => (
+                          <tr key={k.id || k.key_code} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="py-2.5 px-3 font-mono font-bold text-white">
+                              {k.key_code}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  k.plan === 'pro_lifetime'
+                                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                    : k.plan === 'pro_year'
+                                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                                    : k.plan === 'tutor_school'
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                    : 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
+                                }`}
+                              >
+                                {k.plan}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  k.status === 'active'
+                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                    : k.status === 'revoked'
+                                    ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                                    : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
+                                }`}
+                              >
+                                {k.status === 'active' ? 'Активен' : k.status === 'revoked' ? 'Заблокирован' : 'Истек'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-300">
+                              {k.activations_count || 0} / {k.max_activations || 1}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
+                              {k.expires_at ? new Date(k.expires_at).toLocaleDateString('ru-RU') : 'Бессрочно'}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-400 max-w-xs truncate" title={k.notes || ''}>
+                              {k.notes || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(k.key_code);
+                                    setCopiedKey(k.key_code);
+                                    setTimeout(() => setCopiedKey(null), 2000);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-colors"
+                                  title="Копировать ключ"
+                                >
+                                  {copiedKey === k.key_code ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleKey(k.key_code, k.status)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    k.status === 'active'
+                                      ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400'
+                                      : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400'
+                                  }`}
+                                  title={k.status === 'active' ? 'Заблокировать ключ' : 'Разблокировать ключ'}
+                                >
+                                  {k.status === 'active' ? <Ban className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteKey(k.key_code)}
+                                  className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                                  title="Удалить ключ"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+
+                      {licenses.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-slate-500">
+                            Ключи еще не созданы. Используйте генератор выше, чтобы выпустить первый ключ.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

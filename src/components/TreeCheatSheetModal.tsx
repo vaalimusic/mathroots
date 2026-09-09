@@ -13,9 +13,10 @@ import {
   ArrowRight,
   AlertTriangle,
   Lightbulb,
-  Layers,
-  ChevronDown
+  ChevronDown,
+  Lock,
 } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
 
 interface TreeCheatSheetModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export const TreeCheatSheetModal: React.FC<TreeCheatSheetModalProps> = ({
   masteredIds,
   onNavigateToNode,
 }) => {
+  const { isPro, openUpgradeModal } = useLicense();
   const [copied, setCopied] = useState(false);
   const [selectedLayer, setSelectedLayer] = useState<number | 'all'>('all');
 
@@ -179,12 +181,22 @@ export const TreeCheatSheetModal: React.FC<TreeCheatSheetModalProps> = ({
 
             <button
               id="btn-print-cheat-sheet"
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
-              title="Печать или сохранение в PDF"
+              onClick={() => {
+                if (!isPro) {
+                  openUpgradeModal('Экспорт в PDF и чистая печать A4');
+                } else {
+                  handlePrint();
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-lg transition-all ${
+                isPro
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                  : 'bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-indigo-950/40'
+              }`}
+              title={isPro ? 'Печать или сохранение в PDF' : 'Экспорт в PDF доступен в версии PRO'}
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Печать / PDF</span>
+              {isPro ? <Printer className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-amber-200" />}
+              <span>{isPro ? 'Печать / PDF' : 'Печать / PDF (PRO 🔒)'}</span>
             </button>
 
             <button

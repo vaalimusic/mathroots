@@ -5,6 +5,7 @@
  */
 
 const TOKEN_KEY = 'mathroots_auth_token';
+const LICENSE_STORAGE_KEY = 'mathroots_license_key';
 
 export function getAuthToken(): string | null {
   try {
@@ -30,8 +31,33 @@ export function clearAuthToken() {
   }
 }
 
+export function getStoredLicenseKey(): string | null {
+  try {
+    return localStorage.getItem(LICENSE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredLicenseKey(key: string) {
+  try {
+    localStorage.setItem(LICENSE_STORAGE_KEY, key.trim().toUpperCase());
+  } catch {
+    // ignore
+  }
+}
+
+export function clearStoredLicenseKey() {
+  try {
+    localStorage.removeItem(LICENSE_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
+  const licenseKey = getStoredLicenseKey();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -39,6 +65,9 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}):
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (licenseKey) {
+    headers['X-License-Key'] = licenseKey;
   }
 
   const res = await fetch(endpoint, {
@@ -252,6 +281,82 @@ export const api = {
 
   async clearAiCache() {
     return await apiRequest('/api/admin/cache', {
+      method: 'DELETE',
+    });
+  },
+
+  // -------------------------------------------------------------
+  // License & Monetization
+  // -------------------------------------------------------------
+  async getLicenseStatus(): Promise<{
+    isPro: boolean;
+    plan: string;
+    keyCode?: string;
+    expiresAt?: string;
+    status?: string;
+    maxActivations?: number;
+    activationsCount?: number;
+  }> {
+    try {
+      return await apiRequest('/api/license/status');
+    } catch {
+      return { isPro: false, plan: 'free', status: 'offline' };
+    }
+  },
+
+  async activateLicense(key: string): Promise<{
+    success: boolean;
+    isPro: boolean;
+    plan: string;
+    keyCode: string;
+    expiresAt?: string;
+    error?: string;
+  }> {
+    return await apiRequest('/api/license/activate', {
+      method: 'POST',
+      body: JSON.stringify({ key: key.trim().toUpperCase() }),
+    });
+  },
+
+  async getAdminLicenses(): Promise<{
+    success: boolean;
+    keys: any[];
+    stats: {
+      totalKeys: number;
+      activeKeys: number;
+      revokedKeys: number;
+      totalActivations: number;
+      byPlan: Record<string, number>;
+    };
+  }> {
+    return await apiRequest('/api/admin/licenses');
+  },
+
+  async generateAdminLicense(params: {
+    plan: string;
+    maxActivations?: number;
+    notes?: string;
+    expiresDays?: number;
+  }): Promise<{
+    success: boolean;
+    key: any;
+    customerMessage: string;
+  }> {
+    return await apiRequest('/api/admin/licenses/generate', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async toggleAdminLicense(code: string, status: 'active' | 'revoked'): Promise<{ success: boolean }> {
+    return await apiRequest('/api/admin/licenses/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ code, status }),
+    });
+  },
+
+  async deleteAdminLicense(code: string): Promise<{ success: boolean }> {
+    return await apiRequest(`/api/admin/licenses/${encodeURIComponent(code)}`, {
       method: 'DELETE',
     });
   },

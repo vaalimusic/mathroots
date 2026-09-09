@@ -22,8 +22,11 @@ import {
   Upload,
   FileJson,
   Copy,
-  FileUp
+  FileUp,
+  Lock,
+  Crown
 } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
 
 interface TreeBuilderModalProps {
   isOpen: boolean;
@@ -42,6 +45,7 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
   onClose,
   onSaveTree,
 }) => {
+  const { isPro, openUpgradeModal } = useLicense();
   const [treeTitle, setTreeTitle] = useState(activeTree.title);
   const [goalFormula, setGoalFormula] = useState(activeTree.goalFormula);
   const [category, setCategory] = useState(activeTree.category);
@@ -531,6 +535,17 @@ export const TreeBuilderModal: React.FC<TreeBuilderModalProps> = ({
             <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm whitespace-nowrap">
               <Wand2 className="w-4 h-4 text-indigo-400" />
               <span>AI Авто-декомпозиция:</span>
+              {!isPro && (
+                <button
+                  type="button"
+                  onClick={() => openUpgradeModal('Безлимитный AI разбор произвольных задач')}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1 hover:bg-amber-500/25 transition-colors cursor-pointer"
+                  title="Нажмите для разблокировки безлимитной декомпозиции PRO"
+                >
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>PRO</span>
+                </button>
+              )}
             </div>
 
             <div className="flex-1 flex items-center gap-2">

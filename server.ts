@@ -819,6 +819,175 @@ app.delete("/api/admin/cache", requireAdmin, async (_req: AuthRequest, res) => {
 });
 
 // -------------------------------------------------------------
+// License & Monetization API Routes
+// -------------------------------------------------------------
+
+// Check license status for current user / client
+app.get("/api/license/status", optionalAuth, async (req: AuthRequest, res) => {
+  try {
+    const rawKey = (req.headers["x-license-key"] as string) || (req.query.key as string);
+    if (!rawKey) {
+      return res.json({ isPro: false, plan: "free", status: "unlicensed" });
+    }
+
+    const key = await db.getLicenseKeyByCode(rawKey);
+    if (!key) {
+      return res.json({ isPro: false, plan: "free", status: "not_found" });
+    }
+
+    if (key.status !== "active") {
+      return res.json({ isPro: false, plan: "free", status: key.status });
+    }
+
+    if (key.expires_at && new Date(key.expires_at) < new Date()) {
+      await db.updateLicenseKeyStatus(key.key_code, "expired");
+      return res.json({ isPro: false, plan: "free", status: "expired" });
+    }
+
+    res.json({
+      isPro: true,
+      plan: key.plan,
+      keyCode: key.key_code,
+      expiresAt: key.expires_at,
+      status: key.status,
+      maxActivations: key.max_activations,
+      activationsCount: key.activations_count,
+    });
+  } catch (err: any) {
+    res.status(500).json({ isPro: false, error: err.message });
+  }
+});
+
+// Activate license key by user
+app.post("/api/license/activate", optionalAuth, async (req: AuthRequest, res) => {
+  try {
+    const { key } = req.body;
+    if (!key || typeof key !== "string" || !key.trim()) {
+      return res.status(400).json({ success: false, error: "Пожалуйста, введите лицензионный ключ" });
+    }
+
+    const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress;
+    const result = await db.activateLicenseKey(key.trim(), {
+      userId: req.userId,
+      ip: clientIp,
+    });
+
+    if (!result.success || !result.key) {
+      return res.status(400).json({ success: false, error: result.error || "Не удалось активировать ключ" });
+    }
+
+    const activatedKey = result.key;
+    res.json({
+      success: true,
+      isPro: true,
+      plan: activatedKey.plan,
+      keyCode: activatedKey.key_code,
+      expiresAt: activatedKey.expires_at,
+      activationsCount: activatedKey.activations_count,
+      maxActivations: activatedKey.max_activations,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || "Ошибка активации ключа" });
+  }
+});
+
+// Admin: List all licenses and statistics
+app.get("/api/admin/licenses", requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const keys = await db.listLicenseKeys(200);
+    const stats = await db.getLicenseStats();
+    res.json({ success: true, keys, stats });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка получения списка лицензий", details: err.message });
+  }
+});
+
+// Admin: Generate new license key
+app.post("/api/admin/licenses/generate", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { plan = "pro_year", maxActivations, notes, expiresDays } = req.body;
+    const validPlans = ["pro_month", "pro_year", "pro_lifetime", "tutor_school"];
+    if (!validPlans.includes(plan)) {
+      return res.status(400).json({ error: "Недопустимый тарифный план" });
+    }
+
+    // Generate readable random key: MR-PRO-XXXX-XXXX-XXXX
+    const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase() + "-" +
+      Math.random().toString(36).substring(2, 6).toUpperCase() + "-" +
+      Math.random().toString(36).substring(2, 6).toUpperCase();
+    const prefix = plan === "tutor_school" ? "MR-SCH" : "MR-PRO";
+    const keyCode = `${prefix}-${randomHex}`;
+
+    let expiresAt: Date | null = null;
+    const now = new Date();
+    if (typeof expiresDays === "number" && expiresDays > 0) {
+      expiresAt = new Date(now.getTime() + expiresDays * 24 * 60 * 60 * 1000);
+    } else if (plan === "pro_month") {
+      expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    } else if (plan === "pro_year") {
+      expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    } else if (plan === "tutor_school") {
+      expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    } else if (plan === "pro_lifetime") {
+      expiresAt = null;
+    }
+
+    const defaultMaxActivations = plan === "tutor_school" ? 25 : 1;
+    const keyEntry = await db.createLicenseKey({
+      keyCode,
+      plan,
+      maxActivations: typeof maxActivations === "number" && maxActivations > 0 ? maxActivations : defaultMaxActivations,
+      expiresAt,
+      notes: notes || null,
+    });
+
+    const planNames: Record<string, string> = {
+      pro_month: "PRO Месяц (30 дней)",
+      pro_year: "PRO Год (365 дней)",
+      pro_lifetime: "PRO Навсегда (Бессрочный доступ)",
+      tutor_school: "Школьный / Репетитор (до 25 учеников)",
+    };
+
+    const planTitle = planNames[plan] || plan;
+    const expiresText = expiresAt ? expiresAt.toLocaleDateString("ru-RU") : "Бессрочно (Навсегда)";
+    const customerMessage = `Здравствуйте! Ваш лицензионный ключ доступа MathRoots PRO:\n\n🔑 Ключ: ${keyCode}\n📦 Тариф: ${planTitle}\n⏳ Срок действия: ${expiresText}\n\nКак активировать:\n1. Откройте сайт платформы\n2. Нажмите кнопку «💎 Активировать PRO» в верхнем меню\n3. Вставьте ваш ключ и нажмите «Активировать»\n\nПриятных занятий и успехов в математике!`;
+
+    res.json({
+      success: true,
+      key: keyEntry,
+      customerMessage,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка генерации лицензионного ключа", details: err.message });
+  }
+});
+
+// Admin: Toggle license status (active / revoked)
+app.post("/api/admin/licenses/toggle", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { code, status } = req.body;
+    if (!code || !status || !["active", "revoked"].includes(status)) {
+      return res.status(400).json({ error: "Параметры code и корректный status ('active' | 'revoked') обязательны" });
+    }
+    const success = await db.updateLicenseKeyStatus(code, status);
+    res.json({ success });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка изменения статуса ключа", details: err.message });
+  }
+});
+
+// Admin: Delete license key
+app.delete("/api/admin/licenses/:code", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const code = req.params.code;
+    const success = await db.deleteLicenseKey(code);
+    res.json({ success });
+  } catch (err: any) {
+    res.status(500).json({ error: "Ошибка удаления ключа", details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
 // Vite and Static File Serving
 // -------------------------------------------------------------
 
