@@ -50,6 +50,15 @@ const aiLimiter = rateLimit({
 });
 app.use("/api/ai", aiLimiter);
 
+// Rate limit Auth and Admin setup attempts
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Слишком много попыток входа или настройки. Пожалуйста, подождите немного." },
+});
+
 // Lazy Gemini client helper
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
