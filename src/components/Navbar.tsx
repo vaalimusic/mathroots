@@ -24,6 +24,7 @@ import {
   Shield,
   Crown,
   Lock,
+  BookOpen,
 } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
 
